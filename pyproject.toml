@@ -8,8 +8,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "License :: Other/Proprietary License",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
     "Environment :: Console",
@@ -26,7 +24,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.12"
 PyYAML = "^6.0.2"
 azure-common = "^1.1.28"
 azure-core = "^1.30.2"
@@ -34,7 +32,12 @@ azure-identity = "^1.16.1"
 azure-mgmt-core = "^1.4.0"
 azure-mgmt-datafactory = "^8.0.0"
 databricks-sdk = "^0.20.0"
+databricks-bundles = "^0.286.0"
 autopep8 = "^2.3.2"
+click = "^8.1.7"
+
+[tool.poetry.scripts]
+wkmigrate = "wkmigrate.cli:cli"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
@@ -74,13 +77,16 @@ docs_base_path = "docs/wkmigrate/docs"
 relative_output_path = "reference/api"
 relative_sidebar_path = "sidebar.json"
 
+[tool.pydoc-markdown.renderer.markdown]
+escape_html_in_docstring = false
+
 # by default method and function are on level 4 which is too deep for docusaurus
 # we want to move them to level 3
 markdown = { header_level_by_type = { Method = 3, Function = 3, Class = 2, Module = 1 } }
 
 [tool.mypy]
 mypy_path = "src"
-exclude = ['venv', '.venv', 'tests/*', 'examples/*']
+exclude = ['venv', '.venv', 'tests/*', 'examples/*', 'sandbox/*']
 
 [[tool.mypy.overrides]]
 module = ["google", "google.*"]  # Google libraries are not type annotated
@@ -92,16 +98,16 @@ cache_dir = ".venv/pytest-cache"
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.black]
-target-version = ["py310"]
+target-version = ["py312"]
 line-length = 120
 skip-string-normalization = true
-extend-exclude = 'demos/|tests/e2e/notebooks'
+extend-exclude = 'demos/|tests/e2e/notebooks|sandbox/'
 
 [tool.ruff]
 cache-dir = ".venv/ruff-cache"
-target-version = "py310"
+target-version = "py312"
 line-length = 120
-exclude = ["demos/*", "tests/e2e/notebooks", "ui/*"]
+exclude = ["demos/*", "tests/e2e/notebooks", "ui/*", "sandbox/*"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["databricks.labs.dqx"]

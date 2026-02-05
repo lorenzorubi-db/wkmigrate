@@ -1,4 +1,10 @@
-"""Linked service IR models."""
+"""This module defines internal representations for linked services.
+
+Linked services in this module represent connections to external services and systems used by
+various pipeline activities (e.g. Copy Data, Lookup Value). Each linked service contains metadata
+specific to the associated service. Linked services are translated from ADF payloads into internal
+representations that can be used to connect to services from Databricks.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-@dataclass
+@dataclass(slots=True)
 class LinkedService:
     """
     Base class representing a translated linked service.
@@ -20,7 +26,7 @@ class LinkedService:
     service_type: str
 
 
-@dataclass
+@dataclass(slots=True)
 class SqlLinkedService(LinkedService):
     """
     Linked-service metadata for SQL/JDBC connections to a relational database.
@@ -38,7 +44,7 @@ class SqlLinkedService(LinkedService):
     authentication_type: str | None = None
 
 
-@dataclass
+@dataclass(slots=True)
 class AbfsLinkedService(LinkedService):
     """
     Linked-service metadata for ABFS/ADLS storage accounts.
@@ -52,7 +58,7 @@ class AbfsLinkedService(LinkedService):
     url: str | None = None
 
 
-@dataclass
+@dataclass(slots=True)
 class DatabricksClusterLinkedService(LinkedService):
     """
     Linked-service metadata describing a Databricks workspace/cluster.
@@ -84,17 +90,3 @@ class DatabricksClusterLinkedService(LinkedService):
     autoscale: dict[str, int] | None = None
     num_workers: int | None = None
     pat: str | None = None
-
-
-@dataclass
-class UnsupportedLinkedService(LinkedService):
-    """
-    IR representation for a linked service that cannot be translated.
-
-    Attributes:
-        message: Description of why the linked service is unsupported.
-        adf_definition: Raw ADF linked-service payload that could not be parsed.
-    """
-
-    message: str | None = None
-    adf_definition: dict[str, Any] | None = None

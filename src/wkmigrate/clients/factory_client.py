@@ -1,4 +1,10 @@
-"""Defines the ``FactoryClient`` class."""
+"""This module defines a client for interacting with Azure Data Factory.
+
+Clients in this module interact with Azure Data Factory to retrieve pipeline, dataset,
+linked service, and trigger definitions. Clients validate required fields, authenticate
+using the provided credentials, and make API calls to the Data Factory resource using
+the Azure Data Factory management client.
+"""
 
 from dataclasses import dataclass, field
 
@@ -6,7 +12,7 @@ from azure.identity import ClientSecretCredential
 from azure.mgmt.datafactory import DataFactoryManagementClient
 
 
-@dataclass
+@dataclass(slots=True)
 class FactoryClient:
     """
     Data Factory management client for retrieving pipelines, datasets, linked services, and triggers.

@@ -1,4 +1,10 @@
-"""Dataset IR models."""
+"""This module defines internal representations for datasets.
+
+Datasets in this module represent the source and sink datasets used by various pipeline activities
+(e.g. Copy Data, Lookup Value). Each dataset contains metadata about the dataset's type, name, and
+parameters. Datasets are translated from ADF payloads into internal representations that can be used
+to generate Databricks Lakeflow jobs.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
-@dataclass
+@dataclass(slots=True)
 class Dataset:
     """
     Base class representing a parsed dataset.
@@ -22,7 +28,7 @@ class Dataset:
     service_name: str | None = None
 
 
-@dataclass
+@dataclass(slots=True)
 class FileDataset(Dataset):
     """
     Dataset definition for file-based sources and sinks in an ABFS/ADLS storage account.
@@ -44,7 +50,7 @@ class FileDataset(Dataset):
     records_per_file: int | None = None
 
 
-@dataclass
+@dataclass(slots=True)
 class DeltaTableDataset(Dataset):
     """
     Dataset definition for Delta tables accessible from a Databricks cluster.
@@ -60,7 +66,7 @@ class DeltaTableDataset(Dataset):
     catalog_name: str | None = None
 
 
-@dataclass
+@dataclass(slots=True)
 class SqlTableDataset(Dataset):
     """
     Dataset definition for JDBC-accessible tables in a relational database.
@@ -86,7 +92,7 @@ class SqlTableDataset(Dataset):
     connection_options: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(slots=True)
 class DatasetProperties:
     """
     Container for dataset property metadata produced during parsing.
@@ -98,17 +104,3 @@ class DatasetProperties:
 
     dataset_type: str
     options: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class UnsupportedDataset(Dataset):
-    """
-    IR representation for a dataset that cannot be translated.
-
-    Attributes:
-        message: Description of why the dataset is unsupported.
-        adf_definition: Raw ADF dataset payload that could not be parsed.
-    """
-
-    message: str | None = None
-    adf_definition: dict[str, Any] | None = None

@@ -1,7 +1,7 @@
 from contextlib import nullcontext as does_not_raise
 import pytest
-from wkmigrate.activity_translators.activity_translator import translate_activities, translate_activity
-from wkmigrate.models.ir.activities import DatabricksNotebookActivity, Dependency, IfConditionActivity
+from wkmigrate.translators.activity_translators.activity_translator import translate_activities, translate_activity
+from wkmigrate.models.ir.pipeline import DatabricksNotebookActivity, Dependency, IfConditionActivity
 
 
 class TestActivityTranslator:
@@ -31,7 +31,6 @@ class TestActivityTranslator:
                     DatabricksNotebookActivity(
                         name="Activity1",
                         task_key="Activity1",
-                        activity_type="DatabricksNotebook",
                         description="Test activity",
                         timeout_seconds=3600,
                         max_retries=3,
@@ -60,7 +59,6 @@ class TestActivityTranslator:
                     DatabricksNotebookActivity(
                         name="Activity1",
                         task_key="Activity1",
-                        activity_type="DatabricksNotebook",
                         description="Test activity",
                         timeout_seconds=1800,
                         max_retries=3,
@@ -110,23 +108,21 @@ class TestActivityTranslator:
                     DatabricksNotebookActivity(
                         name="UNNAMED_TASK",
                         task_key="UNNAMED_TASK",
-                        activity_type="DatabricksNotebook",
                         description="Test activity",
                         timeout_seconds=604800,
                         max_retries=3,
                         min_retry_interval_millis=30000,
-                        depends_on=[Dependency(task_key="PreviousActivity", outcome=["Succeeded"])],
+                        depends_on=[Dependency(task_key="PreviousActivity", outcome=None)],
                         notebook_path="/path/to/notebook",
                     ),
                     DatabricksNotebookActivity(
                         name="UNNAMED_TASK",
                         task_key="UNNAMED_TASK",
-                        activity_type="DatabricksNotebook",
                         description="Test activity",
                         timeout_seconds=604800,
                         max_retries=3,
                         min_retry_interval_millis=30000,
-                        depends_on=[Dependency(task_key="PreviousActivity", outcome=["Succeeded"])],
+                        depends_on=[Dependency(task_key="PreviousActivity", outcome=None)],
                         notebook_path="/path/to/notebook",
                     ),
                 ],
@@ -156,12 +152,11 @@ class TestActivityTranslator:
                 DatabricksNotebookActivity(
                     name="Activity1",
                     task_key="Activity1",
-                    activity_type="DatabricksNotebook",
                     description="Test activity",
                     timeout_seconds=604800,
                     max_retries=3,
                     min_retry_interval_millis=30000,
-                    depends_on=[],
+                    depends_on=None,
                     notebook_path="/path/to/notebook",
                 ),
                 does_not_raise(),
@@ -179,25 +174,19 @@ class TestActivityTranslator:
                 IfConditionActivity(
                     name="IfConditionActivity",
                     task_key="IfConditionActivity",
-                    activity_type="IfCondition",
                     description="Test if-else condition activity",
                     op="EQUAL_TO",
                     left="true",
                     right="true",
                     child_activities=[],
                 ),
-                pytest.warns(UserWarning),
+                does_not_raise(),
             ),
         ],
     )
     def test_translate_activity_parses_result(self, activity_definition, expected_result, context):
         with context:
-            result_ir = translate_activity(activity_definition)
-            # ``translate_activity`` may return a single Activity or (Activity, [Activity])
-            if isinstance(result_ir, tuple):
-                activity = result_ir[0]
-            else:
-                activity = result_ir
+            activity = translate_activity(activity_definition)
             assert activity == expected_result
 
     def test_translate_unsupported_activity_creates_placeholder(self):
@@ -208,9 +197,7 @@ class TestActivityTranslator:
             "description": "Should fall back to placeholder",
             "policy": {"timeout": "0.00:10:00"},
         }
-        result_ir = translate_activity(unsupported_definition)
-        activity = result_ir if not isinstance(result_ir, tuple) else result_ir[0]
-        assert activity.activity_type == "CustomUnsupportedType"
+        activity = translate_activity(unsupported_definition)
         assert activity.task_key == "UnsupportedActivity"
         assert activity.timeout_seconds == 600
         assert activity.notebook_path == "/UNSUPPORTED_ADF_ACTIVITY"
