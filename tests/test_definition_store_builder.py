@@ -21,6 +21,20 @@ DEFINITION_STORE_CASES = [
         },
         does_not_raise(),
     ),
+    # FactoryDefinitionStore: with source_property_case option
+    (
+        "factory_definition_store",
+        {
+            "tenant_id": "TENANT_ID",
+            "client_id": "CLIENT_ID",
+            "client_secret": "SECRET",
+            "subscription_id": "SUBSCRIPTION_ID",
+            "resource_group_name": "RESOURCE_GROUP",
+            "factory_name": "FACTORY_NAME",
+            "source_property_case": "camel",
+        },
+        does_not_raise(),
+    ),
     # WorkspaceDefinitionStore: missing options
     ("workspace_definition_store", None, pytest.raises(ValueError)),
     # WorkspaceDefinitionStore: minimal valid options

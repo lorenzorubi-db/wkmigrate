@@ -16,6 +16,94 @@ from wkmigrate.models.ir.pipeline import Activity, DatabricksNotebookActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 
 
+def camel_to_snake(name: str) -> str:
+    """
+    Converts a camelCase or PascalCase string to snake_case.
+
+    Used when loading ADF definitions that use camelCase (e.g. REST/portal export)
+    so that downstream code, which expects snake_case keys, works unchanged.
+    Note: acronyms (e.g. HTTPResponse) may not round-trip cleanly.
+
+    Args:
+        name: Identifier in camelCase or PascalCase.
+
+    Returns:
+        Same identifier in snake_case.
+    """
+    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+
+def recursive_camel_to_snake(obj: Any) -> Any:
+    """
+    Recursively converts all dict keys in a structure from camelCase to snake_case.
+    Leaves list order and non-dict values unchanged. Creates new dicts/lists (no in-place mutation).
+
+    Args:
+        obj: Nested structure of dicts, lists, and primitives (e.g. ADF JSON).
+
+    Returns:
+        New structure with the same values but dict keys in snake_case.
+    """
+    if isinstance(obj, dict):
+        return {camel_to_snake(k): recursive_camel_to_snake(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [recursive_camel_to_snake(item) for item in obj]
+    return obj
+
+
+def normalize_arm_pipeline(pipeline: dict) -> dict:
+    """
+    Normalizes an ARM/REST-style ADF pipeline into the flat shape expected by
+    translate_pipeline: top-level activities, parameters, trigger, tags, and
+    per-activity fields (e.g. type_properties merged into the activity root).
+
+    Use for pipeline JSON that has a "properties" wrapper and/or activities
+    with "typeProperties" / "type_properties" (e.g. exported from the Azure portal).
+    Call recursive_camel_to_snake first if the payload is camelCase.
+
+    Args:
+        pipeline: Raw pipeline dict (camelCase or snake_case).
+
+    Returns:
+        Pipeline dict with name, activities, parameters, trigger, tags, and
+        each activity with type_properties merged into the root.
+    """
+    if isinstance(pipeline.get("properties"), dict):
+        props = pipeline["properties"]
+        activities = props.get("activities") or props.get("Activities") or []
+        parameters = props.get("parameters") if "parameters" in props else props.get("Parameters")
+        if parameters is None:
+            parameters = {}
+        out = {
+            "name": pipeline.get("name"),
+            "activities": list(activities),
+            "parameters": parameters,
+            "trigger": None,
+            "tags": pipeline.get("tags") or props.get("annotations") or {},
+        }
+    else:
+        out = dict(pipeline)
+        if out.get("trigger") is None and "trigger" not in out:
+            out["trigger"] = None
+    activities = out.get("activities") or []
+    normalized_activities = []
+    for act in activities:
+        if not isinstance(act, dict):
+            normalized_activities.append(act)
+            continue
+        a = dict(act)
+        type_props = a.pop("type_properties", None) or a.pop("typeProperties", None)
+        if isinstance(type_props, dict):
+            for k, v in type_props.items():
+                key = camel_to_snake(k) if isinstance(k, str) else k
+                if key not in a:
+                    a[key] = v
+        normalized_activities.append(a)
+    out["activities"] = normalized_activities
+    return out
+
+
 def translate(items: dict | None, mapping: dict) -> dict | None:
     """
     Maps dictionary values using a translation specification.
