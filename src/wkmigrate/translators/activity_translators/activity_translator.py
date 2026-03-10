@@ -30,6 +30,7 @@ from wkmigrate.translators.activity_translators.for_each_activity_translator imp
 from wkmigrate.translators.activity_translators.if_condition_activity_translator import translate_if_condition_activity
 from wkmigrate.translators.activity_translators.lookup_activity_translator import translate_lookup_activity
 from wkmigrate.translators.activity_translators.notebook_activity_translator import translate_notebook_activity
+from wkmigrate.translators.activity_translators.set_variable_activity_translator import translate_set_variable_activity
 from wkmigrate.translators.activity_translators.spark_jar_activity_translator import translate_spark_jar_activity
 from wkmigrate.translators.activity_translators.spark_python_activity_translator import translate_spark_python_activity
 from wkmigrate.translators.activity_translators.web_activity_translator import translate_web_activity
@@ -185,6 +186,8 @@ def _dispatch_activity(
             return translate_if_condition_activity(activity, base_kwargs, context)
         case "ForEach":
             return translate_for_each_activity(activity, base_kwargs, context)
+        case "SetVariable":
+            return translate_set_variable_activity(activity, base_kwargs, context)
         case _:
             translator = context.registry.get(activity_type)
             if translator is not None:
