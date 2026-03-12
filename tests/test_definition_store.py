@@ -7,6 +7,7 @@ import yaml
 
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+from wkmigrate.definition_stores.json_factory_definition_store import JsonFactoryDefinitionStore
 from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
 from wkmigrate.models.ir.pipeline import (
     DatabricksNotebookActivity,
@@ -15,6 +16,9 @@ from wkmigrate.models.ir.pipeline import (
     RunJobActivity,
     WebActivity,
 )
+
+
+_CAMEL_JSON_PATH = os.path.join(os.path.dirname(__file__), "resources", "json", "camel")
 
 
 def test_factory_definition_store_requires_mandatory_fields() -> None:
@@ -323,3 +327,33 @@ def test_to_job_foreach_with_inner_notebook_recurses_dependency_check(mock_works
     )
     job_id = store.to_job(pipeline)
     assert job_id is not None
+
+
+def test_json_store_camel_case_pipeline() -> None:
+    """End-to-end: a camelCase portal-export JSON loaded via JsonFactoryDefinitionStore
+    is normalised to snake_case and translated to the correct Pipeline IR."""
+    store = JsonFactoryDefinitionStore(
+        definition_dir=_CAMEL_JSON_PATH,
+        source_property_case="camel",
+    )
+
+    pipeline = store.load("one_activity_pipeline")
+
+    assert isinstance(pipeline, Pipeline)
+    assert pipeline.name == "one_activity_pipeline"
+    assert len(pipeline.tasks) == 1
+
+    task = pipeline.tasks[0]
+    assert isinstance(task, DatabricksNotebookActivity)
+    assert task.task_key == "run maintenance notebook"
+    assert task.notebook_path == "/Shared/notebooks/maintenance/nb_execute_maintenance"
+    assert task.timeout_seconds == 43200
+    assert task.max_retries == 0
+
+    assert pipeline.parameters is not None
+    param_names = {p["name"] for p in pipeline.parameters}
+    assert param_names == {"target_table", "retention_days"}
+
+    not_translatable_props = {entry["property"] for entry in pipeline.not_translatable}
+    assert "secure_input" in not_translatable_props
+    assert "secure_output" in not_translatable_props
