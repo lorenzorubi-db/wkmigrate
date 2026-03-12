@@ -33,6 +33,7 @@ def test_factory_definition_store_requires_mandatory_fields() -> None:
             factory_name=None,
         )
 
+
 def test_workspace_definition_store_requires_auth_and_host() -> None:
     """WorkspaceDefinitionStore should validate authentication type and host name."""
     with pytest.raises(ValueError):
@@ -57,6 +58,7 @@ def test_factory_definition_store_default_source_property_case_is_snake(
     pipeline = store.load("TEST_PIPELINE_NAME")
     assert pipeline.name == "TEST_PIPELINE_NAME"
 
+
 def test_factory_definition_store_accepts_source_property_case_camel(
     mock_factory_client,
 ) -> None:
@@ -73,6 +75,7 @@ def test_factory_definition_store_accepts_source_property_case_camel(
     )
     pipeline = store.load("TEST_PIPELINE_NAME")
     assert pipeline.name == "TEST_PIPELINE_NAME"
+
 
 def test_factory_definition_store_camel_normalizes_to_snake(
     mock_factory_client,
@@ -122,6 +125,7 @@ def test_factory_definition_store_camel_normalizes_to_snake(
     assert pipeline.name == "CAMEL_PIPELINE"
     assert len(pipeline.tasks) >= 1
 
+
 def test_workspace_definition_store_uses_definition_store_interface(
     mock_workspace_client,
 ) -> None:
@@ -133,6 +137,7 @@ def test_workspace_definition_store_uses_definition_store_interface(
         host_name="https://example.com",
         pat="DUMMY_TOKEN",
     )
+    assert isinstance(store, DefinitionStore)
 
 
 def test_factory_definition_store_uses_definition_store_interface(mock_factory_client) -> None:

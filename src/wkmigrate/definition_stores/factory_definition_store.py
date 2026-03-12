@@ -33,14 +33,13 @@ from dataclasses import dataclass, field
 from collections.abc import Callable
 from typing import Literal
 
-logger = logging.getLogger(__name__)
-
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
 from wkmigrate.utils import recursive_camel_to_snake
 
+logger = logging.getLogger(__name__)
 
 SourcePropertyCase = Literal["camel", "snake"]
 
@@ -237,8 +236,6 @@ class FactoryDefinitionStore(BaseFactoryDefinitionStore):
     subscription_id: str | None = None
     resource_group_name: str | None = None
     factory_name: str | None = None
-    source_property_case: SourcePropertyCase = "snake"
-    factory_client: FactoryClient | None = field(init=False)
 
     def __post_init__(self) -> None:
         BaseFactoryDefinitionStore.__post_init__(self)

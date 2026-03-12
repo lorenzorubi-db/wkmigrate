@@ -6,16 +6,16 @@ named) pipeline into a Databricks asset bundle layout under the output
 directory.
 
 Usage:
-    python scripts/convert_pipeline.py PIPELINE_DIR [--output-dir DIR]
+    python scripts/convert_downld_adf_pipeline.py PIPELINE_DIR [--output-dir DIR]
         [--source-case camel|snake] [--pipeline NAME]
 
 Examples:
     # Convert all pipelines in a directory
-    python scripts/convert_pipeline.py ~/Downloads/adf_pipelines/pipeline
+    python scripts/convert_downld_adf_pipeline.py ~/Downloads/adf_pipelines/pipeline
 
     # Convert a single pipeline by name (filename stem)
-    python scripts/convert_pipeline.py ~/Downloads/adf_pipelines/pipeline \
-        --pipeline lakeh_c_pl_maintenance_vacuum
+    python scripts/convert_downld_adf_pipeline.py ~/Downloads/adf_pipelines/pipeline \
+        --pipeline my_pipeline_name
 """
 
 from __future__ import annotations
@@ -24,7 +24,6 @@ import argparse
 import json
 import os
 import sys
-import warnings
 from pathlib import Path
 
 # Allow running from the repo root without installing the package.
@@ -230,14 +229,14 @@ def main() -> None:
         try:
             pipeline_ir = store.load(name)
         except Exception as exc:
-            warnings.warn(f"  Failed to load pipeline '{name}': {exc}", stacklevel=1)
+            print(f"  ERROR: Failed to load pipeline '{name}': {exc}", file=sys.stderr)
             errors.append((name, exc))
             continue
 
         try:
             prepared = prepare_workflow(pipeline_ir)
         except Exception as exc:
-            warnings.warn(f"  Failed to prepare pipeline '{name}': {exc}", stacklevel=1)
+            print(f"  ERROR: Failed to prepare pipeline '{name}': {exc}", file=sys.stderr)
             errors.append((name, exc))
             continue
 

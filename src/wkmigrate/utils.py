@@ -73,8 +73,6 @@ def normalize_arm_pipeline(pipeline: dict) -> dict:
         props = pipeline["properties"]
         activities = props.get("activities") or props.get("Activities") or []
         parameters = props.get("parameters") if "parameters" in props else props.get("Parameters")
-        if parameters is None:
-            parameters = {}
         out = {
             "name": pipeline.get("name"),
             "activities": list(activities),
