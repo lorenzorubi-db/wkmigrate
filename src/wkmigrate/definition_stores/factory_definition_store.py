@@ -1,5 +1,9 @@
 """This module defines a `FactoryDefinitionStore` class used to load pipeline definitions from Azure Data Factory.
 
+``BaseFactoryDefinitionStore`` holds the shared load logic (fetch pipeline/trigger,
+normalize, resolve datasets and linked services, translate). Subclasses provide
+the client (e.g. FactoryClient for Azure API, JsonFactoryClient for directory JSON).
+
 ``FactoryDefinitionStore`` connects to an ADF instance, loads pipeline JSON via
 the ADF management client, and returns a translated internal representation with
 embedded linked services and datasets. It is typically used as the source store
@@ -24,9 +28,12 @@ Example:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from collections.abc import Callable
 from typing import Literal
+
+logger = logging.getLogger(__name__)
 
 from wkmigrate.clients.factory_client import FactoryClient
 from wkmigrate.definition_stores.definition_store import DefinitionStore
@@ -39,73 +46,30 @@ SourcePropertyCase = Literal["camel", "snake"]
 
 
 @dataclass(slots=True)
-class FactoryDefinitionStore(DefinitionStore):
+class BaseFactoryDefinitionStore(DefinitionStore):
     """
-    Definition store implementation backed by an Azure Data Factory instance.
-
-    Attributes:
-        tenant_id: Azure AD tenant identifier.
-        client_id: Service principal application (client) ID.
-        client_secret: Secret used to authenticate the client.
-        subscription_id: Azure subscription identifier.
-        resource_group_name: Resource group name for the factory.
-        factory_name: Name of the Azure Data Factory instance.
-        source_property_case: How property names are represented in the source.
-            Use ``\"snake\"`` when the client returns snake_case (default; Azure Python SDK).
-            Use ``\"camel\"`` when the source uses camelCase (e.g. raw REST/portal export).
-            When ``\"camel\"\", payloads are normalized to snake_case at the boundary.
-        factory_client: Concrete ``FactoryClient`` used to load pipelines and child resources. Automatically created using the provided credentials.
+    Base for definition stores that load ADF pipeline dicts, resolve datasets and
+    linked services, and translate to ``Pipeline``. Subclasses set ``factory_client``
+    (API or JSON) and optionally override ``_normalize_pipeline_structure``.
     """
 
-    tenant_id: str | None = None
-    client_id: str | None = None
-    client_secret: str | None = None
-    subscription_id: str | None = None
-    resource_group_name: str | None = None
-    factory_name: str | None = None
     source_property_case: SourcePropertyCase = "snake"
     factory_client: FactoryClient | None = field(init=False)
     _appenders: list[Callable[[dict], dict]] | None = field(init=False)
     _normalized_cache: dict[tuple[str, str], dict] = field(init=False)
 
     def __post_init__(self) -> None:
-        """
-        Validates configuration and initializes the Factory client.
-
-        Raises:
-            ValueError: If the tenant ID is not provided.
-            ValueError: If the client ID is not provided.
-            ValueError: If the client secret is not provided.
-            ValueError: If the subscription ID is not provided.
-            ValueError: If the resource group name is not provided.
-            ValueError: If the factory name is not provided.
-        """
         self._appenders = [self._append_datasets, self._append_linked_service]
         self._normalized_cache = {}
-        if self.tenant_id is None:
-            raise ValueError("A tenant_id must be provided when creating a FactoryDefinitionStore")
-        if self.client_id is None:
-            raise ValueError("A client_id must be provided when creating a FactoryDefinitionStore")
-        if self.client_secret is None:
-            raise ValueError("A client_secret must be provided when creating a FactoryDefinitionStore")
-        if self.subscription_id is None:
-            raise ValueError("subscription_id cannot be None")
-        if self.resource_group_name is None:
-            raise ValueError("resource_group_name cannot be None")
-        if self.factory_name is None:
-            raise ValueError("factory_name cannot be None")
 
-        self.factory_client = FactoryClient(
-            tenant_id=self.tenant_id,
-            client_id=self.client_id,
-            client_secret=self.client_secret,
-            subscription_id=self.subscription_id,
-            resource_group_name=self.resource_group_name,
-            factory_name=self.factory_name,
-        )
+    def _normalize_pipeline_structure(self, pipeline: dict) -> dict:
+        """Optional hook to normalize pipeline shape (e.g. ARM unwrap). Default: identity."""
+        return pipeline
 
-    def _normalize_if_camel(self, d: dict, cache_key: tuple[str, str] | None = None) -> dict:
+    def _normalize_if_camel(self, d: dict | None, cache_key: tuple[str, str] | None = None) -> dict | None:
         """Normalize dict to snake_case when source_property_case is 'camel'; optionally cache by key."""
+        if d is None:
+            return None
         if self.source_property_case != "camel":
             return d
         if cache_key is not None and cache_key in self._normalized_cache:
@@ -131,9 +95,12 @@ class FactoryDefinitionStore(DefinitionStore):
         if self.factory_client is None:
             raise ValueError("factory_client is not initialized")
         pipeline = self.factory_client.get_pipeline(pipeline_name)
+        pipeline = self._normalize_pipeline_structure(dict(pipeline))
         pipeline = self._normalize_if_camel(pipeline, cache_key=None)
+
         trigger = self.factory_client.get_trigger(pipeline_name)
         pipeline["trigger"] = self._normalize_if_camel(trigger, cache_key=None)
+
         activities = pipeline.get("activities")
         if activities is not None:
             pipeline["activities"] = [self._append_objects(activity) for activity in activities]
@@ -219,10 +186,16 @@ class FactoryDefinitionStore(DefinitionStore):
         if linked_service_reference is not None:
             linked_service_name = linked_service_reference.get("reference_name")
             if linked_service_name:
-                raw = self.factory_client.get_linked_service(linked_service_name)
-                activity["linked_service_definition"] = self._normalize_if_camel(
-                    raw, ("linked_service", linked_service_name)
-                )
+                try:
+                    raw = self.factory_client.get_linked_service(linked_service_name)
+                    activity["linked_service_definition"] = self._normalize_if_camel(
+                        raw, ("linked_service", linked_service_name)
+                    )
+                except ValueError:
+                    logger.warning(
+                        "Linked service '%s' not found; skipping cluster spec for activity.",
+                        linked_service_name,
+                    )
 
         if_false_activities = activity.get("if_false_activities")
         if if_false_activities is not None:
@@ -240,3 +213,53 @@ class FactoryDefinitionStore(DefinitionStore):
         if activities is not None:
             activity["activities"] = [self._append_linked_service(activity) for activity in activities]
         return activity
+
+
+@dataclass(slots=True)
+class FactoryDefinitionStore(BaseFactoryDefinitionStore):
+    """
+    Definition store backed by an Azure Data Factory instance (management API).
+
+    Attributes:
+        tenant_id: Azure AD tenant identifier.
+        client_id: Service principal application (client) ID.
+        client_secret: Secret used to authenticate the client.
+        subscription_id: Azure subscription identifier.
+        resource_group_name: Resource group name for the factory.
+        factory_name: Name of the Azure Data Factory instance.
+        source_property_case: ``\"snake\"`` when the client returns snake_case (default);
+            ``\"camel\"`` when the source uses camelCase (normalized to snake_case at the boundary).
+    """
+
+    tenant_id: str | None = None
+    client_id: str | None = None
+    client_secret: str | None = None
+    subscription_id: str | None = None
+    resource_group_name: str | None = None
+    factory_name: str | None = None
+    source_property_case: SourcePropertyCase = "snake"
+    factory_client: FactoryClient | None = field(init=False)
+
+    def __post_init__(self) -> None:
+        BaseFactoryDefinitionStore.__post_init__(self)
+        if self.tenant_id is None:
+            raise ValueError("A tenant_id must be provided when creating a FactoryDefinitionStore")
+        if self.client_id is None:
+            raise ValueError("A client_id must be provided when creating a FactoryDefinitionStore")
+        if self.client_secret is None:
+            raise ValueError("A client_secret must be provided when creating a FactoryDefinitionStore")
+        if self.subscription_id is None:
+            raise ValueError("subscription_id cannot be None")
+        if self.resource_group_name is None:
+            raise ValueError("resource_group_name cannot be None")
+        if self.factory_name is None:
+            raise ValueError("factory_name cannot be None")
+
+        self.factory_client = FactoryClient(
+            tenant_id=self.tenant_id,
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            subscription_id=self.subscription_id,
+            resource_group_name=self.resource_group_name,
+            factory_name=self.factory_name,
+        )
