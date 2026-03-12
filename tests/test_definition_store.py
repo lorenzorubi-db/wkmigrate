@@ -35,9 +35,9 @@ def test_workspace_definition_store_requires_auth_and_host() -> None:
         WorkspaceDefinitionStore(  # type: ignore[call-arg]
             authentication_type="invalid",
             host_name=None,
+        )
 
 def test_factory_definition_store_default_source_property_case_is_snake(
-    self,
     mock_factory_client,
 ) -> None:
     """Default source_property_case is 'snake'; load works with snake_case payloads."""
@@ -54,7 +54,6 @@ def test_factory_definition_store_default_source_property_case_is_snake(
     assert pipeline.name == "TEST_PIPELINE_NAME"
 
 def test_factory_definition_store_accepts_source_property_case_camel(
-    self,
     mock_factory_client,
 ) -> None:
     """Store with source_property_case='camel' accepts options and load still works (snake payload stays snake)."""
@@ -72,7 +71,6 @@ def test_factory_definition_store_accepts_source_property_case_camel(
     assert pipeline.name == "TEST_PIPELINE_NAME"
 
 def test_factory_definition_store_camel_normalizes_to_snake(
-    self,
     mock_factory_client,
     monkeypatch,
 ) -> None:
@@ -121,7 +119,6 @@ def test_factory_definition_store_camel_normalizes_to_snake(
     assert len(pipeline.tasks) >= 1
 
 def test_workspace_definition_store_uses_definition_store_interface(
-    self,
     mock_workspace_client,
 ) -> None:
     """WorkspaceDefinitionStore should behave as a DefinitionStore when wired with a mock workspace client."""
