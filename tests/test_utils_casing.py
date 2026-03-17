@@ -98,3 +98,29 @@ class TestNormalizeArmPipeline:
         assert act.get("notebook_path") == "/path"
         assert act.get("base_parameters") == {}
         assert "type_properties" not in act
+
+    def test_list_annotations_converted_to_tags_dict(self) -> None:
+        """ADF annotations (list of strings) should be converted to a tags dict."""
+        pipeline = {
+            "name": "p1",
+            "properties": {
+                "activities": [],
+                "annotations": ["MyLabel", "AnotherLabel"],
+            },
+        }
+        got = normalize_arm_pipeline(pipeline)
+        assert isinstance(got["tags"], dict)
+        assert got["tags"]["MyLabel"] == ""
+        assert got["tags"]["AnotherLabel"] == ""
+
+    def test_empty_annotations_gives_empty_tags(self) -> None:
+        """Empty annotations list should produce empty tags dict."""
+        pipeline = {
+            "name": "p1",
+            "properties": {
+                "activities": [],
+                "annotations": [],
+            },
+        }
+        got = normalize_arm_pipeline(pipeline)
+        assert isinstance(got["tags"], dict)
