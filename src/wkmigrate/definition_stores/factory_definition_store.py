@@ -26,11 +26,12 @@ Example:
     ```
 """
 
-from __future__ import annotations
-
 import logging
+import os
+
 from dataclasses import dataclass, field
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Literal
 
 from wkmigrate.clients.factory_client import FactoryClient
@@ -53,7 +54,8 @@ class BaseFactoryDefinitionStore(DefinitionStore):
     """
 
     source_property_case: SourcePropertyCase = "snake"
-    factory_client: FactoryClient | None = field(init=False)
+    factory_name: str | None = None
+    _factory_client: FactoryClient | None = field(init=False)
     _appenders: list[Callable[[dict], dict]] | None = field(init=False)
     _normalized_cache: dict[tuple[str, str], dict] = field(init=False)
 
@@ -78,6 +80,52 @@ class BaseFactoryDefinitionStore(DefinitionStore):
             self._normalized_cache[cache_key] = out
         return out
 
+    def list_pipelines(self) -> list[str]:
+        """
+        Returns the names of all pipelines available in the Data Factory.
+
+        Returns:
+            Pipeline names as a ``list[str]``.
+
+        Raises:
+            ValueError: If the factory client is not initialized.
+        """
+        if self._factory_client is None:
+            raise ValueError("Factory client is not initialized")
+        return self._factory_client.list_pipelines()
+
+    def load_all(self, pipeline_names: list[str] | None = None) -> list[Pipeline]:
+        """
+        Loads and translates multiple ADF pipelines.
+
+        When ``pipeline_names`` is ``None`` all pipelines in the factory are
+        loaded. Individual pipeline failures are logged and skipped so that
+        one broken pipeline does not prevent the rest from being translated.
+
+        Args:
+            pipeline_names: Optional list of pipeline names to translate. When
+                ``None``, every pipeline in the factory is included.
+
+        Returns:
+            Translated ``Pipeline`` objects as a ``list[Pipeline]``.
+
+        Raises:
+            ValueError: If the factory client is not initialized.
+        """
+        if self._factory_client is None:
+            raise ValueError("Factory client is not initialized")
+        if pipeline_names is None:
+            pipeline_names = self.list_pipelines()
+        results: list[Pipeline] = []
+        with ThreadPoolExecutor(max_workers=self._get_worker_count()) as executor:
+            futures = {executor.submit(self.load, name): name for name in pipeline_names}
+            for future in as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as e:
+                    logger.warning(f"Could not load pipeline '{futures[future]}'", exc_info=e)
+        return results
+
     def load(self, pipeline_name: str) -> Pipeline:
         """
         Returns an internal ``Pipeline`` representation of a Data Factory pipeline.
@@ -91,13 +139,13 @@ class BaseFactoryDefinitionStore(DefinitionStore):
         Raises:
             ValueError: If the factory client is not initialized.
         """
-        if self.factory_client is None:
-            raise ValueError("factory_client is not initialized")
-        pipeline = self.factory_client.get_pipeline(pipeline_name)
+        if self._factory_client is None:
+            raise ValueError("Factory client is not initialized")
+        pipeline = self._factory_client.get_pipeline(pipeline_name)
         pipeline = self._normalize_pipeline_structure(dict(pipeline))
         pipeline = self._normalize_if_camel(pipeline, cache_key=None)
 
-        trigger = self.factory_client.get_trigger(pipeline_name)
+        trigger = self._factory_client.get_trigger(pipeline_name)
         pipeline["trigger"] = self._normalize_if_camel(trigger, cache_key=None)
 
         activities = pipeline.get("activities")
@@ -136,8 +184,8 @@ class BaseFactoryDefinitionStore(DefinitionStore):
         Raises:
             ValueError: If the factory client is not initialized.
         """
-        if self.factory_client is None:
-            raise ValueError("factory_client is not initialized")
+        if self._factory_client is None:
+            raise ValueError("Factory client is not initialized")
         if "inputs" in activity:
             datasets = activity.get("inputs")
             if datasets is not None:
@@ -146,7 +194,7 @@ class BaseFactoryDefinitionStore(DefinitionStore):
                 ]
                 activity["input_dataset_definitions"] = [
                     self._normalize_if_camel(
-                        self.factory_client.get_dataset(name), ("dataset", name)
+                        self._factory_client.get_dataset(name), ("dataset", name)
                     )
                     for name in dataset_names
                     if name
@@ -159,7 +207,7 @@ class BaseFactoryDefinitionStore(DefinitionStore):
                 ]
                 activity["output_dataset_definitions"] = [
                     self._normalize_if_camel(
-                        self.factory_client.get_dataset(name), ("dataset", name)
+                        self._factory_client.get_dataset(name), ("dataset", name)
                     )
                     for name in dataset_names
                     if name
@@ -179,14 +227,14 @@ class BaseFactoryDefinitionStore(DefinitionStore):
         Raises:
             ValueError: If the factory client is not initialized.
         """
-        if self.factory_client is None:
-            raise ValueError("factory_client is not initialized")
+        if self._factory_client is None:
+            raise ValueError("Factory client is not initialized")
         linked_service_reference = activity.get("linked_service_name")
         if linked_service_reference is not None:
             linked_service_name = linked_service_reference.get("reference_name")
             if linked_service_name:
                 try:
-                    raw = self.factory_client.get_linked_service(linked_service_name)
+                    raw = self._factory_client.get_linked_service(linked_service_name)
                     activity["linked_service_definition"] = self._normalize_if_camel(
                         raw, ("linked_service", linked_service_name)
                     )
@@ -212,6 +260,17 @@ class BaseFactoryDefinitionStore(DefinitionStore):
         if activities is not None:
             activity["activities"] = [self._append_linked_service(activity) for activity in activities]
         return activity
+
+    @staticmethod
+    def _get_worker_count() -> int:
+        """
+        Returns the number of threadpool workers to use.
+
+        Returns:
+            Number of threadpool workers as an ``int``.
+        """
+        cpu_count = os.cpu_count()
+        return cpu_count * 2 if cpu_count is not None else 1
 
 
 @dataclass(slots=True)
@@ -252,7 +311,7 @@ class FactoryDefinitionStore(BaseFactoryDefinitionStore):
         if self.factory_name is None:
             raise ValueError("factory_name cannot be None")
 
-        self.factory_client = FactoryClient(
+        self._factory_client = FactoryClient(
             tenant_id=self.tenant_id,
             client_id=self.client_id,
             client_secret=self.client_secret,
@@ -260,3 +319,4 @@ class FactoryDefinitionStore(BaseFactoryDefinitionStore):
             resource_group_name=self.resource_group_name,
             factory_name=self.factory_name,
         )
+
