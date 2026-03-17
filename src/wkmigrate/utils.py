@@ -55,6 +55,13 @@ def recursive_camel_to_snake(obj: Any) -> Any:
     return obj
 
 
+def _annotations_to_tags(annotations: list | dict | None) -> dict | None:
+    """Convert ADF annotations (a list of strings) to a tags dict."""
+    if isinstance(annotations, list):
+        return {a: "" for a in annotations if isinstance(a, str)} or None
+    return annotations
+
+
 def normalize_arm_pipeline(pipeline: dict) -> dict:
     """
     Normalizes an ARM/REST-style ADF pipeline into the flat shape expected by
@@ -81,7 +88,7 @@ def normalize_arm_pipeline(pipeline: dict) -> dict:
             "activities": list(activities),
             "parameters": parameters,
             "trigger": None,
-            "tags": pipeline.get("tags") or props.get("annotations") or {},
+            "tags": pipeline.get("tags") or _annotations_to_tags(props.get("annotations")) or {},
         }
     else:
         out = dict(pipeline)
