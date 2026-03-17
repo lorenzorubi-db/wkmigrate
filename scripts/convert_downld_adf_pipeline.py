@@ -46,7 +46,7 @@ from wkmigrate.preparers.preparer import prepare_workflow  # noqa: E402
 def write_asset_bundle(prepared: PreparedWorkflow, bundle_dir: str) -> None:
     """Write a Databricks asset bundle from a PreparedWorkflow."""
     os.makedirs(bundle_dir, exist_ok=True)
-    bundle_name = prepared.job_settings.get("name") or "workflow"
+    bundle_name = prepared.pipeline.name or "workflow"
     jobs_dir = os.path.join(bundle_dir, "resources", "jobs")
     pipelines_dir = os.path.join(bundle_dir, "resources", "pipelines")
     notebooks_dir = os.path.join(bundle_dir, "notebooks")
@@ -55,34 +55,42 @@ def write_asset_bundle(prepared: PreparedWorkflow, bundle_dir: str) -> None:
     os.makedirs(notebooks_dir, exist_ok=True)
 
     # Job definition
-    job_settings = dict(prepared.job_settings)
-    job_settings.pop("not_translatable", None)
-    job_settings.pop("inner_jobs", None)
+    job_settings = {
+        "name": bundle_name,
+        "tasks": [_serialize(t) for t in prepared.tasks],
+    }
+    if prepared.pipeline.parameters:
+        job_settings["parameters"] = prepared.pipeline.parameters
+    if prepared.pipeline.tags:
+        job_settings["tags"] = prepared.pipeline.tags
+    if prepared.pipeline.schedule:
+        job_settings["schedule"] = _serialize(prepared.pipeline.schedule)
     job_file = os.path.join(jobs_dir, f"{bundle_name}.yml")
-    job_resource = {"resources": {"jobs": {bundle_name: _serialize(job_settings)}}}
+    job_resource = {"resources": {"jobs": {bundle_name: job_settings}}}
     with open(job_file, "w", encoding="utf-8") as fh:
         yaml.safe_dump(job_resource, fh, sort_keys=False)
 
     # Inner jobs
-    for inner_job in prepared.job_settings.get("inner_jobs") or []:
-        inner_name = inner_job.get("name") or "inner_job"
-        inner_payload = dict(inner_job)
-        inner_payload.pop("not_translatable", None)
-        inner_payload.pop("inner_jobs", None)
+    for inner_wf in prepared.inner_workflows:
+        inner_name = inner_wf.pipeline.name or "inner_job"
+        inner_settings = {
+            "name": inner_name,
+            "tasks": [_serialize(t) for t in inner_wf.tasks],
+        }
         inner_file = os.path.join(jobs_dir, f"{inner_name}.yml")
-        inner_resource = {"resources": {"jobs": {inner_name: _serialize(inner_payload)}}}
+        inner_resource = {"resources": {"jobs": {inner_name: inner_settings}}}
         with open(inner_file, "w", encoding="utf-8") as fh:
             yaml.safe_dump(inner_resource, fh, sort_keys=False)
 
     # Generated notebooks
-    for notebook in prepared.notebooks or []:
+    for notebook in prepared.all_notebooks or []:
         nb_path = os.path.join(notebooks_dir, notebook.file_path.lstrip("/"))
         os.makedirs(os.path.dirname(nb_path), exist_ok=True)
         with open(nb_path, "w", encoding="utf-8") as fh:
             fh.write(notebook.content)
 
     # DLT pipeline resources
-    for instruction in prepared.pipelines or []:
+    for instruction in prepared.all_pipelines or []:
         pipeline_payload = {
             "resources": {
                 "pipelines": {
@@ -113,19 +121,19 @@ def write_asset_bundle(prepared: PreparedWorkflow, bundle_dir: str) -> None:
             "linked_service_type": s.service_type,
             "provided_value": s.provided_value,
         }
-        for s in (prepared.secrets or [])
+        for s in (prepared.all_secrets or [])
     ]
     with open(os.path.join(bundle_dir, "secrets.json"), "w", encoding="utf-8") as fh:
         json.dump(secrets_formatted, fh, indent=2, ensure_ascii=False)
 
     # Unsupported
     with open(os.path.join(bundle_dir, "unsupported.json"), "w", encoding="utf-8") as fh:
-        json.dump(prepared.unsupported or [], fh, indent=2, ensure_ascii=False)
+        json.dump(prepared.pipeline.not_translatable or [], fh, indent=2, ensure_ascii=False)
 
     # Minimal bundle manifest (placeholder host)
     pipeline_resources = [
         os.path.join("resources", "pipelines", f"{p.name}.yml")
-        for p in (prepared.pipelines or [])
+        for p in (prepared.all_pipelines or [])
     ]
     job_resources = [os.path.relpath(job_file, bundle_dir)]
     manifest = {
@@ -142,7 +150,10 @@ def write_asset_bundle(prepared: PreparedWorkflow, bundle_dir: str) -> None:
 def _serialize(obj):
     """Recursively convert dataclasses / SDK objects to JSON-safe dicts."""
     import dataclasses as dc
+    import enum
 
+    if isinstance(obj, enum.Enum):
+        return obj.value
     if hasattr(obj, "as_dict"):
         return {k: _serialize(v) for k, v in obj.as_dict().items() if v is not None}
     if dc.is_dataclass(obj) and not isinstance(obj, type):
