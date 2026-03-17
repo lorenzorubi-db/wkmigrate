@@ -63,6 +63,7 @@ class Activity:
     depends_on: list["Dependency"] | None = None
     new_cluster: dict | None = None
     libraries: list[dict[str, Any]] | None = None
+    run_if: str | None = None
 
 
 @dataclass(slots=True, kw_only=True)

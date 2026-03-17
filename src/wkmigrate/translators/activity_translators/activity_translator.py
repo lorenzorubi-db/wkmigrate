@@ -305,6 +305,7 @@ def _get_base_properties(activity: dict, is_conditional_task: bool = False) -> d
     cluster_spec = activity.get("linked_service_definition")
     new_cluster = translate_databricks_cluster_spec(cluster_spec) if cluster_spec else None
     task_key = activity.get("name") or "UNNAMED_TASK"
+    run_if = _derive_run_if(activity.get("depends_on")) if not is_conditional_task else None
     return {
         "name": task_key,
         "task_key": task_key,
@@ -315,6 +316,7 @@ def _get_base_properties(activity: dict, is_conditional_task: bool = False) -> d
         "depends_on": depends_on,
         "new_cluster": new_cluster,
         "libraries": activity.get("libraries"),
+        "run_if": run_if,
     }
 
 
@@ -368,6 +370,26 @@ def _parse_policy(policy: dict | None) -> dict:
     return parsed_policy
 
 
+def _derive_run_if(dependencies: list[dict] | None) -> str | None:
+    """Derive the Databricks ``run_if`` value from ADF dependency conditions.
+
+    Returns ``None`` when all conditions are ``Succeeded`` (the default),
+    ``ALL_DONE`` when any condition is ``Completed``, or
+    ``AT_LEAST_ONE_FAILED`` when any condition is ``Failed``.
+    """
+    if not dependencies:
+        return None
+    conditions = set()
+    for dep in dependencies:
+        for c in dep.get("dependency_conditions", []):
+            conditions.add(c.upper())
+    if "FAILED" in conditions:
+        return "AT_LEAST_ONE_FAILED"
+    if "COMPLETED" in conditions:
+        return "ALL_DONE"
+    return None
+
+
 def _parse_dependencies(
     dependencies: list[dict] | None, is_conditional_task: bool = False
 ) -> list[Dependency | UnsupportedValue] | None:
@@ -405,7 +427,7 @@ def _parse_dependency(dependency: dict, is_conditional_task: bool = False) -> De
         supported_conditions = ["TRUE", "FALSE"]
         outcome = dependency.get("outcome")
     else:
-        supported_conditions = ["SUCCEEDED"]
+        supported_conditions = ["SUCCEEDED", "COMPLETED", "FAILED"]
         outcome = None
 
     if any(condition.upper() not in supported_conditions for condition in conditions):
