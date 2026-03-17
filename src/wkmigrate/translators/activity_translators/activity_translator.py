@@ -380,8 +380,11 @@ def _derive_run_if(dependencies: list[dict] | None) -> str | None:
         return None
     conditions = set()
     for dep in dependencies:
-        for c in dep.get("dependency_conditions", []):
-            conditions.add(c.upper())
+        dep_conditions = {c.upper() for c in dep.get("dependency_conditions", [])}
+        # ['Succeeded', 'Failed'] is equivalent to 'Completed'
+        if dep_conditions == {"SUCCEEDED", "FAILED"}:
+            dep_conditions = {"COMPLETED"}
+        conditions.update(dep_conditions)
     if "FAILED" in conditions:
         return "AT_LEAST_ONE_FAILED"
     if "COMPLETED" in conditions:
@@ -411,25 +414,48 @@ def _parse_dependency(dependency: dict, is_conditional_task: bool = False) -> De
     """
     Parses an individual dependency from a dictionary.
 
+    Handles two kinds of dependencies:
+
+    1. **IfCondition parent wiring** — injected by ``_translate_child_activities`` with
+       an ``outcome`` field (``"true"``/``"false"``). No ``dependency_conditions``.
+    2. **Regular ADF dependencies** — have ``dependency_conditions`` (``Succeeded``,
+       ``Completed``, ``Failed``). No ``outcome``.
+
     Args:
         dependency: Dependency definition as a ``dict``.
-        is_conditional_task: Whether the task is a conditional task.
+        is_conditional_task: Whether the task lives inside a conditional branch
+            (kept for call-site compatibility but not used for dispatch).
 
     Returns:
         Dependency object describing the upstream relationship.
     """
+    outcome = dependency.get("outcome")
+
+    # IfCondition parent wiring: injected by _translate_child_activities,
+    # has "outcome" set, no dependency_conditions.
+    if outcome is not None:
+        if outcome.upper() not in ("TRUE", "FALSE"):
+            return UnsupportedValue(
+                value=dependency, message=f"Unsupported outcome '{outcome}' in IfCondition dependency"
+            )
+        task_key = dependency.get("activity")
+        if not task_key:
+            return UnsupportedValue(value=dependency, message="Missing value 'activity' for task dependency")
+        return Dependency(task_key=task_key, outcome=outcome)
+
+    # Regular ADF dependency: uses dependency_conditions.
     conditions = dependency.get("dependency_conditions", [])
-    if len(conditions) > 1:
+    upper_conditions = {c.upper() for c in conditions}
+
+    # ['Succeeded', 'Failed'] is equivalent to 'Completed' (run regardless of outcome)
+    if upper_conditions == {"SUCCEEDED", "FAILED"}:
+        upper_conditions = {"COMPLETED"}
+
+    if len(upper_conditions) > 1:
         return UnsupportedValue(value=dependency, message="Dependencies with multiple conditions are not supported.")
 
-    if is_conditional_task:
-        supported_conditions = ["TRUE", "FALSE"]
-        outcome = dependency.get("outcome")
-    else:
-        supported_conditions = ["SUCCEEDED", "COMPLETED", "FAILED"]
-        outcome = None
-
-    if any(condition.upper() not in supported_conditions for condition in conditions):
+    supported_conditions = ["SUCCEEDED", "COMPLETED", "FAILED"]
+    if any(c not in supported_conditions for c in upper_conditions):
         return UnsupportedValue(
             value=dependency, message="Dependencies with conditions other than 'Succeeded' are not supported."
         )
@@ -438,4 +464,4 @@ def _parse_dependency(dependency: dict, is_conditional_task: bool = False) -> De
     if not task_key:
         return UnsupportedValue(value=dependency, message="Missing value 'activity' for task dependency")
 
-    return Dependency(task_key=task_key, outcome=outcome)
+    return Dependency(task_key=task_key, outcome=None)

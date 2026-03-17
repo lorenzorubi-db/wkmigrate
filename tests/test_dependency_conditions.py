@@ -165,3 +165,78 @@ class TestMixedConditions:
         assert len(prepared.tasks) == 4
         task_keys = {t["task_key"] for t in prepared.tasks}
         assert {"run_process", "log_result", "error_handler", "finalize"} == task_keys
+
+
+# ============================================================================
+# Fix A: Completed condition inside IfCondition child activity
+# ============================================================================
+
+
+class TestCompletedInsideIfCondition:
+    """A child activity inside an IfCondition branch that depends on a sibling
+    with 'Completed' condition should not crash. The is_conditional_task path
+    currently only allows TRUE/FALSE outcomes."""
+
+    @pytest.fixture
+    def pipeline(self) -> Pipeline:
+        return _load("completed_inside_if_condition")
+
+    def test_pipeline_translates(self, pipeline: Pipeline) -> None:
+        assert len(pipeline.tasks) >= 1
+
+    def test_no_unsupported_dependencies(self, pipeline: Pipeline) -> None:
+        for task in pipeline.tasks:
+            if task.depends_on:
+                for dep in task.depends_on:
+                    assert not isinstance(dep, UnsupportedValue), (
+                        f"Task '{task.name}' has UnsupportedValue dependency "
+                        f"('{dep.message}'). Completed/Failed conditions inside "
+                        "IfCondition children should be accepted. "
+                        "See ghanse/wkmigrate#44."
+                    )
+
+    def test_preparer_does_not_crash(self, pipeline: Pipeline) -> None:
+        prepared = prepare_workflow(pipeline)
+        assert len(prepared.tasks) >= 1
+
+
+# ============================================================================
+# Fix B: Multiple dependency conditions ['Succeeded', 'Failed']
+# ============================================================================
+
+
+class TestMultiConditionDependency:
+    """A dependency with ['Succeeded', 'Failed'] is equivalent to 'Completed'
+    and should be treated as run_if=ALL_DONE, not rejected."""
+
+    @pytest.fixture
+    def pipeline(self) -> Pipeline:
+        return _load("multi_condition_dependency")
+
+    def test_pipeline_translates(self, pipeline: Pipeline) -> None:
+        assert len(pipeline.tasks) == 2
+
+    def test_dependency_is_not_unsupported(self, pipeline: Pipeline) -> None:
+        log_task = next(t for t in pipeline.tasks if t.name == "log_outcome")
+        assert log_task.depends_on is not None
+        assert len(log_task.depends_on) == 1
+        dep = log_task.depends_on[0]
+        assert not isinstance(dep, UnsupportedValue), (
+            "Dependency with ['Succeeded', 'Failed'] returned UnsupportedValue. "
+            "This combination is equivalent to 'Completed' and should be accepted. "
+            "See ghanse/wkmigrate#44."
+        )
+        assert dep.task_key == "call_api"
+
+    def test_run_if_is_all_done(self, pipeline: Pipeline) -> None:
+        """['Succeeded', 'Failed'] is equivalent to Completed → ALL_DONE."""
+        prepared = prepare_workflow(pipeline)
+        log_task = next(t for t in prepared.tasks if t["task_key"] == "log_outcome")
+        assert log_task.get("run_if") == "ALL_DONE", (
+            f"Expected run_if='ALL_DONE' for ['Succeeded','Failed'] dependency, "
+            f"got '{log_task.get('run_if')}'. See ghanse/wkmigrate#44."
+        )
+
+    def test_preparer_does_not_crash(self, pipeline: Pipeline) -> None:
+        prepared = prepare_workflow(pipeline)
+        assert len(prepared.tasks) == 2
