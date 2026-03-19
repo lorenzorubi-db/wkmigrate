@@ -220,21 +220,23 @@ The `code_generator.py` module emits Python source fragments for Databricks note
 
 ## 4. Testing Standards
 
-### Organization
+### Unit Testing
 
-Tests live in `tests/` at the project root. Test files mirror source modules:
+#### Organization
+
+**Unit tests** live in `tests/unit/` and are used to test locally. Test files mirror source modules:
 
 | Source | Test |
 |---|---|
-| `translators/activity_translators/` | `test_activity_translators.py`, `test_activity_translator.py` |
-| `translators/pipeline_translators/` | `test_pipeline_translator.py`, `test_pipeline_integration.py` |
-| `translators/linked_service_translators.py` | `test_linked_service_translator.py`, `test_linked_service_translators.py` |
-| `translators/trigger_translators/` | `test_trigger_translator.py` |
-| `definition_stores/` | `test_definition_store.py`, `test_definition_store_builder.py` |
-| `code_generator.py` | `test_code_generator.py` |
-| `utils.py` | `test_utils.py` |
+| `translators/activity_translators/` | `tests/unit/test_activity_translators.py`, `tests/unit/test_activity_translator.py` |
+| `translators/pipeline_translators/` | `tests/unit/test_pipeline_translator.py`, `tests/unit/test_pipeline_integration.py` |
+| `translators/linked_service_translators.py` | `tests/unit/test_linked_service_translator.py`, `tests/unit/test_linked_service_translators.py` |
+| `translators/trigger_translators/` | `tests/unit/test_trigger_translator.py` |
+| `definition_stores/` | `tests/unit/test_definition_store.py`, `tests/unit/test_definition_store_builder.py` |
+| `code_generator.py` | `tests/unit/test_code_generator.py` |
+| `utils.py` | `tests/unit/test_utils.py` |
 
-### Fixtures
+#### Fixtures
 
 Test data is loaded from JSON files in `tests/resources/activities/` and `tests/resources/json/`. The `conftest.py` module provides:
 
@@ -242,7 +244,7 @@ Test data is loaded from JSON files in `tests/resources/activities/` and `tests/
 - `get_base_kwargs(activity)` to build the standard base-properties dict passed to translators.
 - Named pytest fixtures per activity type: `notebook_activity_fixtures`, `spark_jar_activity_fixtures`, `for_each_activity_fixtures`, etc.
 
-### Mocking
+#### Mocking
 
 External dependencies (Azure SDK, Databricks SDK) are replaced with lightweight doubles defined in `conftest.py`:
 
@@ -250,22 +252,56 @@ External dependencies (Azure SDK, Databricks SDK) are replaced with lightweight 
 - `MockWorkspaceClient`: In-memory doubles for `jobs`, `workspace`, `pipelines`, and `secrets` APIs.
 - Fixtures like `mock_factory_client` and `mock_workspace_client` use `monkeypatch` to swap in the doubles.
 
-### What to Test
+#### What to Test
 
 - **Translator functions**: Given an ADF activity dict and base kwargs, assert the returned `Activity` subtype has the correct fields. Use JSON fixtures for realistic payloads.
 - **Preparer functions**: Given an `Activity` IR, assert the returned `PreparedActivity` has the correct task dict structure, notebook content, and side-effect artifacts.
 - **Definition stores**: Use mock clients to test `load()`, `to_job()`, and `to_asset_bundle()` end-to-end without network calls.
 - **Parsers**: Test expression and dataset parsing with representative ADF expression strings.
-- **Integration tests**: `test_pipeline_integration.py` tests the full `load -> translate -> prepare` pipeline against fixture data.
+
+### Integration Testing
+
+End-to-end integration tests live in `tests/integration/` and are marked with `@pytest.mark.integration`. They are **excluded** from the default `make test` run via `addopts = "-m 'not integration'"` in `pyproject.toml`.
+
+#### Organization
+
+| Module | Purpose |
+|---|---|
+| `tests/integration/conftest.py` | Session- and function-scoped fixtures for Azure credential management, ADF factory provisioning, and sample resource deployment/teardown. |
+| `tests/integration/test_pipeline_integration.py` | Tests `FactoryClient` reads and `FactoryDefinitionStore` load/translate against real ADF resources. |
+
+#### Fixtures
+
+Integration fixtures are layered:
+
+1. **`azure_config`** (session): Loads credentials from environment variables (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_FACTORY_NAME`). Skips the test if any variable is missing.
+2. **`adf_factory`** (session): Ensures the test Data Factory exists via `create_or_update`.
+3. **`sample_pipeline`**, **`sample_foreach_pipeline`**, **`sample_linked_service`**, **`sample_dataset`** (session): Deploy and tear down individual ADF resources once per session.
+4. **`factory_client`**, **`factory_store`** (session): Create `FactoryClient` and `FactoryDefinitionStore` instances connected to the test factory.
+
+#### Running Integration Tests
+
+```bash
+# Run only integration tests (requires Azure env vars)
+poetry run pytest -m integration --tb=short -v
+
+# Run all tests including integration
+make integration     # poetry run pytest -m integration (requires Azure env vars)
+```
+
+#### CI Workflow
+
+The `.github/workflows/integration.yml` workflow runs integration tests on pull requests and pushes to `main` (excluding PRs from external forks, which cannot access repository secrets).
 
 ### Running Tests
 
 ```bash
-make test          # poetry run pytest
+make test          # poetry run pytest (excludes integration tests by default)
 make fmt           # black + ruff + mypy + pylint
+make integration   # poetry run pytest -m integration (requires Azure env vars)
 ```
 
-pytest is configured with `--no-header` and suppresses `DeprecationWarning`.
+pytest is configured with `--no-header`, suppresses `DeprecationWarning`, and excludes `integration`-marked tests by default.
 
 ---
 
