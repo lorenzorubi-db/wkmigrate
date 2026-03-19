@@ -6,14 +6,33 @@ using the provided credentials, and make API calls to the Data Factory resource 
 the Azure Data Factory management client.
 """
 
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from azure.identity import ClientSecretCredential
 from azure.mgmt.datafactory import DataFactoryManagementClient
 
 
+class BaseFactoryClient(ABC):
+    """Abstract base class for factory clients (API-backed and JSON-backed)."""
+
+    @abstractmethod
+    def get_pipeline(self, pipeline_name: str) -> dict: ...
+
+    @abstractmethod
+    def get_trigger(self, pipeline_name: str) -> dict | None: ...
+
+    @abstractmethod
+    def get_dataset(self, dataset_name: str) -> dict: ...
+
+    @abstractmethod
+    def get_linked_service(self, linked_service_name: str) -> dict: ...
+
+
 @dataclass(slots=True)
-class FactoryClient:
+class FactoryClient(BaseFactoryClient):
     """
     Data Factory management client for retrieving pipelines, datasets, linked services, and triggers.
 

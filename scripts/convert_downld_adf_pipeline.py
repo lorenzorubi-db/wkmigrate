@@ -7,7 +7,7 @@ directory.
 
 Usage:
     python scripts/convert_downld_adf_pipeline.py PIPELINE_DIR [--output-dir DIR]
-        [--source-case camel|snake] [--pipeline NAME]
+        [--pipeline NAME]
 
 Examples:
     # Convert all pipelines in a directory
@@ -183,12 +183,6 @@ def main() -> None:
         help="Root output directory for generated bundles (default: ./output).",
     )
     parser.add_argument(
-        "--source-case",
-        choices=["camel", "snake"],
-        default="camel",
-        help='Property casing of source JSON: "camel" (default, portal export) or "snake".',
-    )
-    parser.add_argument(
         "--pipeline",
         default=None,
         help="Convert only this pipeline (matched by name or filename stem). "
@@ -205,7 +199,6 @@ def main() -> None:
     # Build the JSON-backed definition store
     store = JsonFactoryDefinitionStore(
         definition_dir=str(pipeline_dir),
-        source_property_case=args.source_case,
     )
 
     available = store.list_pipeline_names()
@@ -230,8 +223,7 @@ def main() -> None:
     else:
         names = available
 
-    print(f"Converting {len(names)} pipeline(s) from {pipeline_dir}")
-    print(f"Source case: {args.source_case}\n")
+    print(f"Converting {len(names)} pipeline(s) from {pipeline_dir}\n")
 
     errors: list[tuple[str, Exception]] = []
 
