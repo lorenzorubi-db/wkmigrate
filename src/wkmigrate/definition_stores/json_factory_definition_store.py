@@ -23,10 +23,13 @@ class JsonFactoryDefinitionStore(BaseFactoryDefinitionStore):
     """
     Definition store backed by a directory of JSON files (JsonFactoryClient).
 
+    JSON files are always normalized to snake_case at load time by the client,
+    so lookups work regardless of the original casing in the source files.
+
     Attributes:
         definition_dir: Path to the directory containing JSON files.
-        source_property_case: ``\"camel\"`` for portal/downloaded JSON (default);
-            ``\"snake\"`` when files are already snake_case.
+        source_property_case: Always ``\"camel\"`` — JSON files downloaded from the
+            ADF portal use camelCase properties.
     """
 
     definition_dir: str | Path | None = None

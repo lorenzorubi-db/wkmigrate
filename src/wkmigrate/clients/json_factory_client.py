@@ -16,6 +16,9 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from wkmigrate.clients.factory_client import BaseFactoryClient
+from wkmigrate.utils import recursive_camel_to_snake
+
 
 def _load_json_list(path: Path) -> list[dict]:
     """Load a JSON file as a list of dicts (or single dict wrapped in a list)."""
@@ -29,10 +32,13 @@ def _load_json_list(path: Path) -> list[dict]:
 
 
 @dataclass(slots=True)
-class JsonFactoryClient:
+class JsonFactoryClient(BaseFactoryClient):
     """
     Client that reads pipeline, trigger, dataset, and linked-service definitions from a directory.
     Same interface as FactoryClient: get_pipeline, get_trigger, get_dataset, get_linked_service.
+
+    All loaded data is normalized to snake_case at load time so that lookups
+    use consistent keys regardless of the original casing in the JSON files.
     """
 
     definition_dir: str | Path
@@ -72,6 +78,11 @@ class JsonFactoryClient:
         self._linked_services = []
         for path in linked_service_files:
             self._linked_services.extend(_load_json_list(path))
+
+        self._pipelines = [recursive_camel_to_snake(p) for p in self._pipelines]
+        self._triggers = [recursive_camel_to_snake(t) for t in self._triggers]
+        self._datasets = [recursive_camel_to_snake(d) for d in self._datasets]
+        self._linked_services = [recursive_camel_to_snake(ls) for ls in self._linked_services]
 
     def list_pipeline_names(self) -> list[str]:
         """Return the names of all loaded pipelines."""

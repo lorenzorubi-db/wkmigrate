@@ -34,7 +34,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Literal
 
-from wkmigrate.clients.factory_client import FactoryClient
+from wkmigrate.clients.factory_client import BaseFactoryClient, FactoryClient
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
@@ -55,11 +55,12 @@ class BaseFactoryDefinitionStore(DefinitionStore):
 
     source_property_case: SourcePropertyCase = "snake"
     factory_name: str | None = None
-    _factory_client: FactoryClient | None = field(init=False)
+    _factory_client: BaseFactoryClient | None = field(init=False)
     _appenders: list[Callable[[dict], dict]] | None = field(init=False)
     _normalized_cache: dict[tuple[str, str], dict] = field(init=False)
 
     def __post_init__(self) -> None:
+        self._factory_client = None
         self._appenders = [self._append_datasets, self._append_linked_service]
         self._normalized_cache = {}
 

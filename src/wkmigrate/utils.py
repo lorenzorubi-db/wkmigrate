@@ -92,7 +92,7 @@ def normalize_arm_pipeline(pipeline: dict) -> dict:
         }
     else:
         out = dict(pipeline)
-        if out.get("trigger") is None and "trigger" not in out:
+        if "trigger" not in out:
             out["trigger"] = None
     activities = out.get("activities") or []
     normalized_activities = []

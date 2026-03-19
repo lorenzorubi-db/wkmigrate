@@ -367,6 +367,23 @@ def test_json_store_camel_case_pipeline() -> None:
     assert "secure_output" in not_translatable_props
 
 
+def test_json_store_camel_case_trigger_matched() -> None:
+    """camelCase trigger JSON (pipelineReference/referenceName) is normalised and
+    matched to the pipeline, producing a schedule in the Pipeline IR."""
+    store = JsonFactoryDefinitionStore(
+        definition_dir=_CAMEL_JSON_PATH,
+        source_property_case="camel",
+    )
+
+    pipeline = store.load("one_activity_pipeline")
+
+    assert pipeline.schedule is not None, (
+        "Trigger was not matched to the pipeline. "
+        "camelCase keys (pipelineReference, referenceName) must be normalised "
+        "to snake_case before lookup."
+    )
+
+
 def test_set_and_get_option(mock_workspace_client) -> None:
     """set_option round-trips a single key via the options dict."""
     store = _make_workspace_store(mock_workspace_client)
