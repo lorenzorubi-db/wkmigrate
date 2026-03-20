@@ -21,7 +21,7 @@ from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActiv
 from wkmigrate.models.workflows.instructions import PipelineInstruction
 
 
-_CAMEL_JSON_PATH = os.path.join(os.path.dirname(__file__), "resources", "json", "camel")
+_CAMEL_JSON_PATH = os.path.join(os.path.dirname(__file__), os.pardir, "resources", "json", "camel")
 
 
 def test_factory_definition_store_requires_mandatory_fields() -> None:

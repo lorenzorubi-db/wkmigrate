@@ -84,7 +84,7 @@ class JsonFactoryClient(BaseFactoryClient):
         self._datasets = [recursive_camel_to_snake(d) for d in self._datasets]
         self._linked_services = [recursive_camel_to_snake(ls) for ls in self._linked_services]
 
-    def list_pipeline_names(self) -> list[str]:
+    def list_pipelines(self) -> list[str]:
         """Return the names of all loaded pipelines."""
         return [p.get("name") for p in self._pipelines if p.get("name")]
 

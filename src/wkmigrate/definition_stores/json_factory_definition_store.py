@@ -43,17 +43,17 @@ class JsonFactoryDefinitionStore(BaseFactoryDefinitionStore):
         if not base.is_dir():
             raise ValueError(f"definition_dir is not a directory: {base}")
         self._factory_client = JsonFactoryClient(definition_dir=base)
-        if not self._factory_client.list_pipeline_names():
+        if not self._factory_client.list_pipelines():
             raise ValueError(
                 f"No pipeline JSON files found in definition_dir: {base}. "
                 "Add one or more .json files containing pipeline definitions."
             )
 
-    def list_pipeline_names(self) -> list[str]:
+    def list_pipelines(self) -> list[str]:
         """Return the names of all pipelines loaded from the store."""
         if self._factory_client is None:
             return []
-        return self._factory_client.list_pipeline_names()
+        return self._factory_client.list_pipelines()
 
     def _normalize_pipeline_structure(self, pipeline: dict) -> dict:
         """Unwrap ARM shape and merge type_properties into activities."""

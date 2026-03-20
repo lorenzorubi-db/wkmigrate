@@ -201,7 +201,7 @@ def main() -> None:
         definition_dir=str(pipeline_dir),
     )
 
-    available = store.list_pipeline_names()
+    available = store.list_pipelines()
     if not available:
         parser.error(f"No pipeline JSON files found in {pipeline_dir}")
 

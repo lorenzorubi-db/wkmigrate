@@ -14,10 +14,11 @@ these classes directly or use the `build_definition_store` method to flexibly cr
 
 The following definition stores are supported:
 
-| Definition store           | Source/target         | Description                                                          |
-|----------------------------|-----------------------|----------------------------------------------------------------------|
-| `FactoryDefinitionStore`   | Azure Data Factory    | Loads and translates Data Factory (ADF) pipelines.                   |
-| `WorkspaceDefinitionStore` | Databricks workspace  | Loads, describes, and creates Databricks Lakeflow jobs (workflows).  |
+| Definition store                | Source/target            | Description                                                          |
+|---------------------------------|--------------------------|----------------------------------------------------------------------|
+| `FactoryDefinitionStore`        | Azure Data Factory (API) | Loads and translates Data Factory (ADF) pipelines via the ADF management API. |
+| `JsonFactoryDefinitionStore`    | Local JSON files         | Loads and translates ADF pipelines from exported JSON files. No Azure credentials required. See [Working with Exported Pipelines](../guide/json-pipelines). |
+| `WorkspaceDefinitionStore`      | Databricks workspace     | Loads, describes, and creates Databricks Lakeflow jobs (workflows).  |
 
 ## FactoryDefinitionStore
 
@@ -251,3 +252,21 @@ workspace_store = build_definition_store(
 <Admonition type="warning" title="Required options">
 Each definition store has a set of required options. If any required option is missing, `build_definition_store` will raise a `ValueError` with more details.
 </Admonition>
+
+## JsonFactoryDefinitionStore
+
+The `JsonFactoryDefinitionStore` loads and translates ADF pipelines from a local directory of JSON files. It uses the same translation logic as `FactoryDefinitionStore` but does not require Azure credentials.
+
+```python
+from wkmigrate.definition_stores.json_factory_definition_store import JsonFactoryDefinitionStore
+
+json_store = JsonFactoryDefinitionStore(
+    definition_dir="/path/to/pipeline/jsons",
+)
+
+pipeline_ir = json_store.load("my_pipeline")
+```
+
+The store identifies file types by naming convention (`*trigger*.json`, `*dataset*.json`, `*linked_service*.json`). Any other `.json` file is treated as a pipeline definition. Missing datasets and linked services produce warnings rather than errors.
+
+See [Working with Exported Pipelines](../guide/json-pipelines) for a full walkthrough.
