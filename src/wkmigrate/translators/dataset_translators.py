@@ -1,8 +1,7 @@
-"""This module defines translators for translating datasets into internal representations.
+"""This module defines translators for normalizing ADF dataset payloads into internal representations.
 
-Translators in this module normalize dataset payloads into internal representations. Each
-translator must validate required fields, coerce connection settings, and emit ``UnsupportedValue``
-objects for any unparsable inputs.
+Each translator validates required fields, coerces connection settings, and emits
+``UnsupportedValue`` objects for any unparsable inputs.
 """
 
 import json
@@ -398,7 +397,12 @@ def _parse_abfs_container_name(properties: dict) -> str | UnsupportedValue:
     location = properties.get("location")
     if location is None:
         return UnsupportedValue(value=properties, message="Missing property 'location' in dataset properties")
-    return location.get("container")
+    result = location.get("container") or location.get("file_system")
+    if result is None:
+        return UnsupportedValue(
+            value=properties, message="Missing property 'container' or 'file_system' in dataset location"
+        )
+    return result
 
 
 def _parse_abfs_file_path(properties: dict) -> str | UnsupportedValue:
@@ -439,7 +443,7 @@ def _parse_cloud_bucket_name(properties: dict) -> str | UnsupportedValue:
     location = properties.get("location")
     if location is None:
         return UnsupportedValue(value=properties, message="Missing property 'location' in dataset properties")
-    bucket = location.get("bucket_name") or location.get("container")
+    bucket = location.get("bucket_name") or location.get("container") or location.get("file_system")
     if bucket is None:
         return UnsupportedValue(
             value=properties, message="Missing property 'bucket_name' or 'container' in dataset location"
