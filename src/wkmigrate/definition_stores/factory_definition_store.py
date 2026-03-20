@@ -187,39 +187,61 @@ class BaseFactoryDefinitionStore(DefinitionStore):
         """
         if self._factory_client is None:
             raise ValueError("Factory client is not initialized")
+        # NOTE: get_dataset() raises ValueError when a dataset is not available
+        # (e.g. not included in a local JSON export). We catch and warn to match
+        # the lenient behaviour of _append_linked_service. A future strict/lenient
+        # client flag will move this responsibility into the client layer — see
+        # docs/lenient_strict_client_mode.md.
         if "inputs" in activity:
             datasets = activity.get("inputs")
             if datasets is not None:
                 dataset_names = [
                     d.get("reference_name") for d in datasets if isinstance(d, dict)
                 ]
-                activity["input_dataset_definitions"] = [
-                    self._normalize_if_camel(
-                        self._factory_client.get_dataset(name), ("dataset", name)
-                    )
-                    for name in dataset_names
-                    if name
-                ]
+                resolved = []
+                for name in dataset_names:
+                    if not name:
+                        continue
+                    try:
+                        resolved.append(
+                            self._normalize_if_camel(
+                                self._factory_client.get_dataset(name), ("dataset", name)
+                            )
+                        )
+                    except ValueError:
+                        logger.warning("Dataset '%s' not found; skipping input dataset for activity.", name)
+                if resolved:
+                    activity["input_dataset_definitions"] = resolved
         if "outputs" in activity:
             datasets = activity.get("outputs")
             if datasets is not None:
                 dataset_names = [
                     d.get("reference_name") for d in datasets if isinstance(d, dict)
                 ]
-                activity["output_dataset_definitions"] = [
-                    self._normalize_if_camel(
-                        self._factory_client.get_dataset(name), ("dataset", name)
-                    )
-                    for name in dataset_names
-                    if name
-                ]
+                resolved = []
+                for name in dataset_names:
+                    if not name:
+                        continue
+                    try:
+                        resolved.append(
+                            self._normalize_if_camel(
+                                self._factory_client.get_dataset(name), ("dataset", name)
+                            )
+                        )
+                    except ValueError:
+                        logger.warning("Dataset '%s' not found; skipping output dataset for activity.", name)
+                if resolved:
+                    activity["output_dataset_definitions"] = resolved
         if "dataset" in activity:
             dataset_ref = activity.get("dataset")
             if dataset_ref is not None:
                 dataset_name = dataset_ref.get("reference_name")
                 if self._factory_client is None:
                     raise ValueError("Factory client is not initialized")
-                activity["input_dataset_definitions"] = [self._factory_client.get_dataset(dataset_name)]
+                try:
+                    activity["input_dataset_definitions"] = [self._factory_client.get_dataset(dataset_name)]
+                except ValueError:
+                    logger.warning("Dataset '%s' not found; skipping dataset for activity.", dataset_name)
         return activity
 
     def _append_linked_service(self, activity: dict) -> dict:
