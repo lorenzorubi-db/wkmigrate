@@ -213,6 +213,13 @@ class BaseFactoryDefinitionStore(DefinitionStore):
                     for name in dataset_names
                     if name
                 ]
+        if "dataset" in activity:
+            dataset_ref = activity.get("dataset")
+            if dataset_ref is not None:
+                dataset_name = dataset_ref.get("reference_name")
+                if self._factory_client is None:
+                    raise ValueError("Factory client is not initialized")
+                activity["input_dataset_definitions"] = [self._factory_client.get_dataset(dataset_name)]
         return activity
 
     def _append_linked_service(self, activity: dict) -> dict:
