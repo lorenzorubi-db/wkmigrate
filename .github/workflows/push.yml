@@ -40,7 +40,9 @@ jobs:
           pip install poetry==2.2.1
           poetry source remove pypi-proxy 2>/dev/null || true
           poetry config repositories.pypi https://pypi.org/simple
-          make dev test
+          make dev
+          git checkout pyproject.toml
+          make test
 
   fmt:
     runs-on: ubuntu-latest
@@ -62,8 +64,14 @@ jobs:
             path: .venv
             key: venv-${{ hashFiles('poetry.lock') }}
 
+      - name: Install dependencies
+        run: make dev
+
+      - name: Restore pyproject.toml
+        run: git checkout pyproject.toml
+
       - name: Format modules
-        run: make dev fmt
+        run: make fmt
 
       - name: Fail on differences
         run: git diff --exit-code
@@ -98,6 +106,7 @@ jobs:
           poetry source remove pypi-proxy 2>/dev/null || true
           poetry config repositories.pypi https://pypi.org/simple
           poetry install
+          git checkout pyproject.toml
 
       - name: Build website
         run: make docs

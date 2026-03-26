@@ -49,6 +49,7 @@ jobs:
           poetry config virtualenvs.create true --local
           poetry config virtualenvs.in-project true --local
           poetry install
+          git checkout pyproject.toml
 
       - name: Run integration tests
         run: poetry run pytest -m integration --tb=short -v
