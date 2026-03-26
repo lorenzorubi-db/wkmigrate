@@ -23,6 +23,10 @@ packages = [
     { include = "wkmigrate", from = "src"}
 ]
 
+[[tool.poetry.source]]
+name = "databricks_proxy"
+url = "https://pypi-proxy.dev.databricks.com/simple/"
+
 [tool.poetry.dependencies]
 python = "^3.12"
 PyYAML = "^6.0.2"

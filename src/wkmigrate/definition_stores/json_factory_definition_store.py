@@ -1,60 +1,17 @@
-"""Definition store that loads ADF pipeline definitions from local JSON files.
+"""Deprecated: Use JsonDefinitionStore directly. This module will be removed in a future release."""
 
-Uses JsonFactoryClient (same interface as FactoryClient) so the same base load logic
-applies. No Azure credentials required. When the directory contains pipeline, dataset,
-and linked-service JSON files, they are resolved like the API-backed store.
-"""
+import warnings
 
-from __future__ import annotations
+from wkmigrate.definition_stores.json_definition_store import JsonDefinitionStore
 
-from dataclasses import dataclass
-from pathlib import Path
-
-from wkmigrate.clients.json_factory_client import JsonFactoryClient
-from wkmigrate.definition_stores.factory_definition_store import (
-    BaseFactoryDefinitionStore,
-    SourcePropertyCase,
+warnings.warn(
+    "The json_factory_definition_store module is deprecated. "
+    "Use wkmigrate.definition_stores.json_definition_store.JsonDefinitionStore instead.",
+    DeprecationWarning,
+    stacklevel=2,
 )
-from wkmigrate.utils import normalize_arm_pipeline
 
+# Backward-compatible alias
+JsonFactoryDefinitionStore = JsonDefinitionStore
 
-@dataclass(slots=True)
-class JsonFactoryDefinitionStore(BaseFactoryDefinitionStore):
-    """
-    Definition store backed by a directory of JSON files (JsonFactoryClient).
-
-    JSON files are always normalized to snake_case at load time by the client,
-    so lookups work regardless of the original casing in the source files.
-
-    Attributes:
-        definition_dir: Path to the directory containing JSON files.
-        source_property_case: Always ``\"camel\"`` — JSON files downloaded from the
-            ADF portal use camelCase properties.
-    """
-
-    definition_dir: str | Path | None = None
-    source_property_case: SourcePropertyCase = "camel"
-
-    def __post_init__(self) -> None:
-        BaseFactoryDefinitionStore.__post_init__(self)
-        if self.definition_dir is None:
-            raise ValueError("definition_dir must be provided")
-        base = Path(self.definition_dir)
-        if not base.is_dir():
-            raise ValueError(f"definition_dir is not a directory: {base}")
-        self._factory_client = JsonFactoryClient(definition_dir=base)
-        if not self._factory_client.list_pipelines():
-            raise ValueError(
-                f"No pipeline JSON files found in definition_dir: {base}. "
-                "Add one or more .json files containing pipeline definitions."
-            )
-
-    def list_pipelines(self) -> list[str]:
-        """Return the names of all pipelines loaded from the store."""
-        if self._factory_client is None:
-            return []
-        return self._factory_client.list_pipelines()
-
-    def _normalize_pipeline_structure(self, pipeline: dict) -> dict:
-        """Unwrap ARM shape and merge type_properties into activities."""
-        return normalize_arm_pipeline(pipeline)
+__all__ = ["JsonFactoryDefinitionStore"]

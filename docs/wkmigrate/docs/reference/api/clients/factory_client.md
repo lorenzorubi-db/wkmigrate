@@ -10,11 +10,19 @@ linked service, and trigger definitions. Clients validate required fields, authe
 using the provided credentials, and make API calls to the Data Factory resource using
 the Azure Data Factory management client.
 
+## BaseFactoryClient Objects
+
+```python
+class BaseFactoryClient(ABC)
+```
+
+Abstract base class for factory clients (API-backed and JSON-backed).
+
 ## FactoryClient Objects
 
 ```python
 @dataclass(slots=True)
-class FactoryClient()
+class FactoryClient(BaseFactoryClient)
 ```
 
 Data Factory management client for retrieving pipelines, datasets, linked services, and triggers.

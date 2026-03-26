@@ -2,7 +2,7 @@
 
 ``BaseFactoryDefinitionStore`` holds the shared load logic (fetch pipeline/trigger,
 normalize, resolve datasets and linked services, translate). Subclasses provide
-the client (e.g. FactoryClient for Azure API, JsonFactoryClient for directory JSON).
+the client (e.g. FactoryClient for Azure API, JsonDefinitionStore for directory JSON).
 
 ``FactoryDefinitionStore`` connects to an ADF instance, loads pipeline JSON via
 the ADF management client, and returns a translated internal representation with
@@ -32,17 +32,14 @@ import os
 from dataclasses import dataclass, field
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Literal
-
 from wkmigrate.clients.factory_client import BaseFactoryClient, FactoryClient
 from wkmigrate.definition_stores.definition_store import DefinitionStore
+from wkmigrate.enums.source_property_case import SourcePropertyCase
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.translators.pipeline_translators.pipeline_translator import translate_pipeline
 from wkmigrate.utils import recursive_camel_to_snake
 
 logger = logging.getLogger(__name__)
-
-SourcePropertyCase = Literal["camel", "snake"]
 
 
 @dataclass(slots=True)
@@ -53,7 +50,7 @@ class BaseFactoryDefinitionStore(DefinitionStore):
     (API or JSON) and optionally override ``_normalize_pipeline_structure``.
     """
 
-    source_property_case: SourcePropertyCase = "snake"
+    source_property_case: SourcePropertyCase = SourcePropertyCase.SNAKE
     factory_name: str | None = None
     _factory_client: BaseFactoryClient | None = field(init=False)
     _appenders: list[Callable[[dict], dict]] | None = field(init=False)
@@ -72,7 +69,7 @@ class BaseFactoryDefinitionStore(DefinitionStore):
         """Normalize dict to snake_case when source_property_case is 'camel'; optionally cache by key."""
         if d is None:
             return None
-        if self.source_property_case != "camel":
+        if self.source_property_case != SourcePropertyCase.CAMEL:
             return d
         if cache_key is not None and cache_key in self._normalized_cache:
             return self._normalized_cache[cache_key]
