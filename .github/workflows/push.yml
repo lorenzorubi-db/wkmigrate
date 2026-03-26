@@ -38,7 +38,7 @@ jobs:
       - name: Run unit tests
         run: |
           pip install poetry==2.2.1
-          poetry source remove proxy || true
+          poetry source remove pypi-proxy 2>/dev/null || true
           poetry config repositories.pypi https://pypi.org/simple
           make dev test
 
@@ -51,7 +51,7 @@ jobs:
       - name: Install Poetry
         run: |
           pip install poetry==2.2.1
-          poetry source remove proxy || true
+          poetry source remove pypi-proxy 2>/dev/null || true
           poetry config repositories.pypi https://pypi.org/simple
           poetry config virtualenvs.create true --local
           poetry config virtualenvs.in-project true --local
@@ -95,7 +95,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry source remove proxy || true
+          poetry source remove pypi-proxy 2>/dev/null || true
           poetry config repositories.pypi https://pypi.org/simple
           poetry install
 
