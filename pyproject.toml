@@ -24,8 +24,8 @@ packages = [
 ]
 
 [[tool.poetry.source]]
-name = "databricks_proxy"
-url = "https://pypi-proxy.dev.databricks.com/simple/"
+name = "proxy"
+url = "https://pypi-proxy.dev.databricks.com/simple"
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -111,7 +111,7 @@ extend-exclude = 'demos/|tests/e2e/notebooks|sandbox/'
 cache-dir = ".venv/ruff-cache"
 target-version = "py312"
 line-length = 120
-exclude = ["demos/*", "tests/e2e/notebooks", "ui/*", "sandbox/*"]
+exclude = ["docs/*", "demos/*", "tests/e2e/notebooks", "ui/*", "sandbox/*"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["wkmigrate"]

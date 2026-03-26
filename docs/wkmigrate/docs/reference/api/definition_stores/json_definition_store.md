@@ -21,23 +21,14 @@ Expected directory structure::
 
 ```python
 @dataclass(slots=True)
-class JsonDefinitionStore(BaseFactoryDefinitionStore)
+class JsonDefinitionStore(DefinitionStore)
 ```
 
 Definition store backed by a directory of JSON files.
 
 Loads pipeline, trigger, dataset, and linked-service definitions from
 subdirectories of ``source_directory``. All loaded data is normalized to
-snake_case at load time so that lookups work regardless of the original
-casing in the source files.
-
-Expected directory layout::
-
-source_directory/
-├── pipelines/          # Required — pipeline definition JSON files
-├── triggers/           # Optional — trigger definition JSON files
-├── datasets/           # Optional — dataset definition JSON files
-└── linked_services/    # Optional — linked-service definition JSON files
+snake_case at load time when ``source_property_case`` is ``CAMEL``.
 
 **Attributes**:
 
@@ -54,13 +45,47 @@ def list_pipelines() -> list[str]
 
 Return the names of all loaded pipelines.
 
+#### load
+
+```python
+def load(pipeline_name: str) -> Pipeline
+```
+
+Load, enrich, and translate a pipeline by name.
+
+**Arguments**:
+
+- `pipeline_name` - Name of the pipeline to load.
+  
+
+**Returns**:
+
+  Translated ``Pipeline`` IR.
+
+#### load\_all
+
+```python
+def load_all(pipeline_names: list[str] | None = None) -> list[Pipeline]
+```
+
+Load and translate multiple pipelines. Failures are logged and skipped.
+
+**Arguments**:
+
+- `pipeline_names` - Names to translate. When ``None``, all pipelines are loaded.
+  
+
+**Returns**:
+
+  Translated ``Pipeline`` objects.
+
 #### get\_pipeline
 
 ```python
 def get_pipeline(pipeline_name: str) -> dict
 ```
 
-Return the pipeline dict for the given name. Raises ValueError if not found.
+Return the pipeline dict for the given name.
 
 #### get\_trigger
 
@@ -68,7 +93,7 @@ Return the pipeline dict for the given name. Raises ValueError if not found.
 def get_trigger(pipeline_name: str) -> dict | None
 ```
 
-Return the trigger for the given pipeline name, or None if none.
+Return the trigger for the given pipeline name, or None.
 
 #### get\_dataset
 
@@ -76,7 +101,7 @@ Return the trigger for the given pipeline name, or None if none.
 def get_dataset(dataset_name: str) -> dict
 ```
 
-Return the dataset dict for the given name. Raises ValueError if not found.
+Return the dataset dict for the given name.
 
 #### get\_linked\_service
 
@@ -84,5 +109,5 @@ Return the dataset dict for the given name. Raises ValueError if not found.
 def get_linked_service(linked_service_name: str) -> dict
 ```
 
-Return the linked-service dict for the given name. Raises ValueError if not found.
+Return the linked-service dict for the given name.
 

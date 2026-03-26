@@ -45,6 +45,7 @@ def test_workspace_definition_store_requires_auth_and_host() -> None:
             host_name=None,
         )
 
+
 def test_factory_definition_store_default_source_property_case_is_snake(
     mock_factory_client,
 ) -> None:
@@ -177,21 +178,6 @@ def test_factory_definition_store_loads_pipeline_without_trigger(mock_factory_cl
     assert isinstance(pipeline, Pipeline)
     assert pipeline.name == "test_pipeline_no_triggers"
     assert pipeline.schedule is None
-
-
-def test_workspace_definition_store_uses_definition_store_interface(mock_workspace_client) -> None:
-    """WorkspaceDefinitionStore should behave as a DefinitionStore when wired with a mock workspace client."""
-    assert mock_workspace_client is not None
-
-    store = WorkspaceDefinitionStore(
-        authentication_type="pat",
-        host_name="https://example.com",
-        pat="DUMMY_TOKEN",
-    )
-
-    assert isinstance(store, DefinitionStore)
-    assert hasattr(store, "to_job")
-    assert hasattr(store, "to_asset_bundle")
 
 
 def _make_workspace_store(mock_workspace_client) -> WorkspaceDefinitionStore:

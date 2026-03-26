@@ -44,6 +44,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install poetry==2.2.1
+          poetry source remove proxy || true
+          poetry config repositories.pypi https://pypi.org/simple
           poetry config virtualenvs.create true --local
           poetry config virtualenvs.in-project true --local
           poetry install

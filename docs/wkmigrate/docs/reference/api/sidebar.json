@@ -4,8 +4,7 @@
       "items": [
         {
           "items": [
-            "reference/api/wkmigrate/clients/factory_client",
-            "reference/api/wkmigrate/clients/json_factory_client"
+            "reference/api/wkmigrate/clients/factory_client"
           ],
           "label": "wkmigrate.clients",
           "type": "category"
@@ -16,6 +15,7 @@
             "reference/api/wkmigrate/definition_stores/definition_store_builder",
             "reference/api/wkmigrate/definition_stores/factory_definition_store",
             "reference/api/wkmigrate/definition_stores/json_definition_store",
+            "reference/api/wkmigrate/definition_stores/pipeline_adapter",
             "reference/api/wkmigrate/definition_stores/workspace_definition_store"
           ],
           "label": "wkmigrate.definition_stores",
