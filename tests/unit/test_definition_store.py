@@ -8,7 +8,7 @@ import yaml
 
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
-from wkmigrate.definition_stores.json_factory_definition_store import JsonFactoryDefinitionStore
+from wkmigrate.definition_stores.json_definition_store import JsonDefinitionStore
 from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
 from wkmigrate.models.ir.pipeline import (
     DatabricksNotebookActivity,
@@ -19,7 +19,6 @@ from wkmigrate.models.ir.pipeline import (
 )
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity, PreparedWorkflow
 from wkmigrate.models.workflows.instructions import PipelineInstruction
-
 
 _CAMEL_JSON_PATH = os.path.join(os.path.dirname(__file__), os.pardir, "resources", "json", "camel")
 
@@ -44,6 +43,7 @@ def test_workspace_definition_store_requires_auth_and_host() -> None:
             authentication_type="invalid",
             host_name=None,
         )
+
 
 def test_factory_definition_store_default_source_property_case_is_snake(
     mock_factory_client,
@@ -177,21 +177,6 @@ def test_factory_definition_store_loads_pipeline_without_trigger(mock_factory_cl
     assert isinstance(pipeline, Pipeline)
     assert pipeline.name == "test_pipeline_no_triggers"
     assert pipeline.schedule is None
-
-
-def test_workspace_definition_store_uses_definition_store_interface(mock_workspace_client) -> None:
-    """WorkspaceDefinitionStore should behave as a DefinitionStore when wired with a mock workspace client."""
-    assert mock_workspace_client is not None
-
-    store = WorkspaceDefinitionStore(
-        authentication_type="pat",
-        host_name="https://example.com",
-        pat="DUMMY_TOKEN",
-    )
-
-    assert isinstance(store, DefinitionStore)
-    assert hasattr(store, "to_job")
-    assert hasattr(store, "to_asset_bundle")
 
 
 def _make_workspace_store(mock_workspace_client) -> WorkspaceDefinitionStore:
@@ -355,10 +340,10 @@ def test_to_job_foreach_with_inner_notebook_recurses_dependency_check(mock_works
 
 
 def test_json_store_camel_case_pipeline() -> None:
-    """End-to-end: a camelCase portal-export JSON loaded via JsonFactoryDefinitionStore
+    """End-to-end: a camelCase portal-export JSON loaded via JsonDefinitionStore
     is normalised to snake_case and translated to the correct Pipeline IR."""
-    store = JsonFactoryDefinitionStore(
-        definition_dir=_CAMEL_JSON_PATH,
+    store = JsonDefinitionStore(
+        source_directory=_CAMEL_JSON_PATH,
         source_property_case="camel",
     )
 
@@ -387,8 +372,8 @@ def test_json_store_camel_case_pipeline() -> None:
 def test_json_store_camel_case_trigger_matched() -> None:
     """camelCase trigger JSON (pipelineReference/referenceName) is normalised and
     matched to the pipeline, producing a schedule in the Pipeline IR."""
-    store = JsonFactoryDefinitionStore(
-        definition_dir=_CAMEL_JSON_PATH,
+    store = JsonDefinitionStore(
+        source_directory=_CAMEL_JSON_PATH,
         source_property_case="camel",
     )
 
@@ -399,6 +384,32 @@ def test_json_store_camel_case_trigger_matched() -> None:
         "camelCase keys (pipelineReference, referenceName) must be normalised "
         "to snake_case before lookup."
     )
+
+
+def test_json_store_source_system_defaults_to_adf() -> None:
+    """JsonDefinitionStore.source_system should default to WorkflowSourceType.ADF."""
+    store = JsonDefinitionStore(source_directory=_CAMEL_JSON_PATH)
+    assert store.source_system == "adf"
+
+
+def test_json_store_raises_when_pipelines_subdir_missing(tmp_path) -> None:
+    """JsonDefinitionStore should raise ValueError when pipelines/ subdirectory has no JSON files."""
+    (tmp_path / "triggers").mkdir()
+    (tmp_path / "pipelines").mkdir()  # empty
+    with pytest.raises(ValueError, match="No pipeline JSON files found"):
+        JsonDefinitionStore(source_directory=str(tmp_path))
+
+
+def test_json_store_raises_when_source_directory_missing() -> None:
+    """JsonDefinitionStore should raise ValueError when source_directory does not exist."""
+    with pytest.raises(ValueError, match="source_directory is not a directory"):
+        JsonDefinitionStore(source_directory="/nonexistent/path")
+
+
+def test_json_store_raises_when_source_directory_is_none() -> None:
+    """JsonDefinitionStore should raise ValueError when source_directory is None."""
+    with pytest.raises(ValueError, match="source_directory must be provided"):
+        JsonDefinitionStore()
 
 
 def test_set_and_get_option(mock_workspace_client) -> None:

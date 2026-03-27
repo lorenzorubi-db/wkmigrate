@@ -17,8 +17,8 @@ import os
 
 import pytest
 
-from wkmigrate.definition_stores.json_factory_definition_store import (
-    JsonFactoryDefinitionStore,
+from wkmigrate.definition_stores.json_definition_store import (
+    JsonDefinitionStore,
 )
 from wkmigrate.models.ir.pipeline import (
     DatabricksNotebookActivity,
@@ -33,8 +33,8 @@ _FIXTURE_DIR = os.path.join(
 
 
 def _load(pipeline_name: str) -> Pipeline:
-    store = JsonFactoryDefinitionStore(
-        definition_dir=_FIXTURE_DIR,
+    store = JsonDefinitionStore(
+        source_directory=_FIXTURE_DIR,
         source_property_case="camel",
     )
     return store.load(pipeline_name)

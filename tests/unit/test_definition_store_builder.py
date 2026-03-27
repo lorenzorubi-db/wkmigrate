@@ -33,6 +33,8 @@ DEFINITION_STORE_CASES = [
         },
         does_not_raise(),
     ),
+    # JsonDefinitionStore: missing options
+    ("json_definition_store", None, pytest.raises(ValueError)),
     ("invalid_definition_store", {}, pytest.raises(ValueError)),
     ("", None, pytest.raises(ValueError)),
 ]

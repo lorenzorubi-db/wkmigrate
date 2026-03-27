@@ -33,8 +33,8 @@ def camel_to_snake(name: str) -> str:
     Returns:
         Same identifier in snake_case.
     """
-    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+    substituted = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", substituted).lower()
 
 
 def recursive_camel_to_snake(obj: Any) -> Any:
@@ -83,7 +83,7 @@ def normalize_arm_pipeline(pipeline: dict) -> dict:
         props = pipeline["properties"]
         activities = props.get("activities") or props.get("Activities") or []
         parameters = props.get("parameters") if "parameters" in props else props.get("Parameters")
-        out = {
+        pipeline_definition = {
             "name": pipeline.get("name"),
             "activities": list(activities),
             "parameters": parameters,
@@ -91,25 +91,20 @@ def normalize_arm_pipeline(pipeline: dict) -> dict:
             "tags": pipeline.get("tags") or _annotations_to_tags(props.get("annotations")) or {},
         }
     else:
-        out = dict(pipeline)
-        if "trigger" not in out:
-            out["trigger"] = None
-    activities = out.get("activities") or []
+        pipeline_definition = dict(pipeline)
+        if "trigger" not in pipeline_definition:
+            pipeline_definition["trigger"] = None
+    activities = pipeline_definition.get("activities") or []
     normalized_activities = []
-    for act in activities:
-        if not isinstance(act, dict):
-            normalized_activities.append(act)
+    for activity in activities:
+        if not isinstance(activity, dict):
+            normalized_activities.append(activity)
             continue
-        a = dict(act)
-        type_props = a.pop("type_properties", None) or a.pop("typeProperties", None)
-        if isinstance(type_props, dict):
-            for k, v in type_props.items():
-                key = camel_to_snake(k) if isinstance(k, str) else k
-                if key not in a:
-                    a[key] = v
-        normalized_activities.append(a)
-    out["activities"] = normalized_activities
-    return out
+        activity_definition = dict(activity)
+        normalized_activity_definition = _normalize_activity_type_properties(activity_definition)
+        normalized_activities.append(normalized_activity_definition)
+    pipeline_definition["activities"] = normalized_activities
+    return pipeline_definition
 
 
 def translate(items: dict | None, mapping: dict) -> dict | None:
@@ -272,20 +267,21 @@ def extract_group(input_string: str, regex: str) -> str | UnsupportedValue:
     return match.group(1)
 
 
-def get_value_or_unsupported(items: dict, key: str) -> Any | UnsupportedValue:
+def get_value_or_unsupported(items: dict, key: str, item_type: str = "dictionary") -> Any | UnsupportedValue:
     """
     Gets a value from a dictionary or returns an ``UnsupportedValue`` object if the key is not found.
 
     Args:
         items: Dictionary to search.
         key: Key to look up.
+        item_type: Item type for error messages (default ``"dictionary"``).
 
     Returns:
         Value as a ``Any`` or ``UnsupportedValue`` object if the key is not found.
     """
     value = items.get(key)
     if value is None:
-        return UnsupportedValue(value=items, message=f"Missing value for key '{key}' in dictionary")
+        return UnsupportedValue(value=items, message=f"Missing value for key '{key}' in {item_type}")
     return value
 
 
@@ -410,3 +406,14 @@ def normalize_translated_result(result: Activity | UnsupportedValue, base_kwargs
         return get_placeholder_activity(base_kwargs)
 
     return result
+
+
+def _normalize_activity_type_properties(activity: dict) -> dict:
+    type_properties = activity.pop("type_properties", None) or activity.pop("typeProperties", None)
+    if isinstance(type_properties, dict):
+        for original_key, original_value in type_properties.items():
+            converted_key = camel_to_snake(original_key) if isinstance(original_key, str) else original_key
+            if converted_key in activity:
+                continue
+            activity[converted_key] = original_value
+    return activity

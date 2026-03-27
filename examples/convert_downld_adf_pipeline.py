@@ -32,8 +32,8 @@ sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 import yaml  # noqa: E402
 
-from wkmigrate.definition_stores.json_factory_definition_store import (  # noqa: E402
-    JsonFactoryDefinitionStore,
+from wkmigrate.definition_stores.json_definition_store import (  # noqa: E402
+    JsonDefinitionStore,
 )
 from wkmigrate.models.workflows.artifacts import PreparedWorkflow  # noqa: E402
 from wkmigrate.preparers.preparer import prepare_workflow  # noqa: E402
@@ -197,11 +197,11 @@ def main() -> None:
     output_root = Path(args.output_dir).expanduser().resolve()
 
     # Build the JSON-backed definition store
-    store = JsonFactoryDefinitionStore(
-        definition_dir=str(pipeline_dir),
+    store = JsonDefinitionStore(
+        source_directory=str(pipeline_dir),
     )
 
-    available = store.list_pipeline_names()
+    available = store.list_pipelines()
     if not available:
         parser.error(f"No pipeline JSON files found in {pipeline_dir}")
 

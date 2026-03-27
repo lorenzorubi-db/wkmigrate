@@ -39,7 +39,7 @@ from databricks.sdk.service.pipelines import NotebookLibrary, PipelineLibrary
 from databricks.sdk.service.workspace import ExportFormat, ImportFormat, Language
 from typing_extensions import deprecated
 
-from wkmigrate.datasets import DEFAULT_CREDENTIALS_SCOPE
+from wkmigrate.parsers.dataset_parsers import DEFAULT_CREDENTIALS_SCOPE
 from wkmigrate.definition_stores.definition_store import DefinitionStore
 from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.models.workflows.artifacts import NotebookArtifact, PreparedActivity
@@ -320,6 +320,10 @@ class WorkspaceDefinitionStore(DefinitionStore):
         """Returns the workspace_url option, or None if not set."""
         return self.options.get('workspace_url')
 
+    def _effective_credentials_scope(self) -> str:
+        """Returns the credentials_scope option, or the default scope if not set."""
+        return self.options.get('credentials_scope', DEFAULT_CREDENTIALS_SCOPE)
+
     def _validate_option_keys(self, keys: Iterable[str]) -> None:
         """
         Validates that all provided keys are recognised option keys.
@@ -365,6 +369,7 @@ class WorkspaceDefinitionStore(DefinitionStore):
         prepared = prepare_workflow(
             pipeline=pipeline_definition,
             files_to_delta_sinks=self._effective_files_to_delta_sinks(),
+            credentials_scope=self._effective_credentials_scope(),
         )
         return self._apply_options(prepared, defer_root_path=defer_root_path)
 
