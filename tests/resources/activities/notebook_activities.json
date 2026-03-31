@@ -238,7 +238,39 @@
       "notebook_path": "/Workspace/notebooks/expression_notebook",
       "base_parameters": {
         "static_param": "static_value",
-        "expression_param": ""
+        "expression_param": "{{job.parameters.dynamic_value}}"
+      }
+    },
+    "expects_warnings": false
+  },
+  {
+    "id": "expression_parameters_complex",
+    "description": "Notebook activity with complex expression parameters that cannot be resolved (should warn)",
+    "input": {
+      "name": "run_complex_expression_notebook",
+      "type": "DatabricksNotebook",
+      "description": "Execute notebook with complex expression parameters",
+      "depends_on": [],
+      "policy": {
+        "timeout": "0.01:00:00"
+      },
+      "notebook_path": "/Workspace/notebooks/complex_expression_notebook",
+      "base_parameters": {
+        "static_param": "static_value",
+        "complex_param": {
+          "value": "@concat(pipeline().parameters.prefix, '_', pipeline().parameters.suffix)",
+          "type": "Expression"
+        }
+      }
+    },
+    "expected": {
+      "name": "run_complex_expression_notebook",
+      "task_key": "run_complex_expression_notebook",
+      "activity_type": "DatabricksNotebook",
+      "notebook_path": "/Workspace/notebooks/complex_expression_notebook",
+      "base_parameters": {
+        "static_param": "static_value",
+        "complex_param": ""
       }
     },
     "expects_warnings": true

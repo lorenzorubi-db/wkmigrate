@@ -154,15 +154,29 @@ def test_notebook_missing_path_returns_unsupported(notebook_activity_fixtures: l
     assert fixture["expected_message"] in result.message
 
 
-def test_notebook_expression_parameters_warns(notebook_activity_fixtures: list[dict]) -> None:
-    """Test that expression parameters emit warnings and are set to empty string."""
+def test_notebook_expression_parameters_resolved(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that simple @pipeline().parameters expressions are resolved to job parameter refs."""
     fixture = get_fixture(notebook_activity_fixtures, "expression_parameters")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DatabricksNotebookActivity)
+    assert result.base_parameters["static_param"] == "static_value"
+    assert result.base_parameters["expression_param"] == "{{job.parameters.dynamic_value}}"
+
+
+def test_notebook_expression_parameters_warns(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that complex expression parameters emit warnings and are set to empty string."""
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_complex")
 
     with pytest.warns(UserWarning):
         result = translate_activity(fixture["input"])
 
     assert isinstance(result, DatabricksNotebookActivity)
-    assert result.base_parameters["expression_param"] == ""
+    assert result.base_parameters["static_param"] == "static_value"
+    assert result.base_parameters["complex_param"] == ""
 
 
 def test_basic_spark_jar_activity(spark_jar_activity_fixtures: list[dict]) -> None:
