@@ -399,9 +399,7 @@ def _derive_run_if(dependencies: list[dict] | None) -> str | None:
         return None
     conditions = set()
     for dep in dependencies:
-        dep_conditions = _normalize_dependency_conditions(
-            set(dep.get("dependency_conditions", []))
-        )
+        dep_conditions = _normalize_dependency_conditions(set(dep.get("dependency_conditions", [])))
         conditions.update(dep_conditions)
     if "FAILED" in conditions:
         return "AT_LEAST_ONE_FAILED"
@@ -428,7 +426,9 @@ def _parse_dependencies(
     return [_parse_dependency(dependency, is_conditional_task) for dependency in dependencies]
 
 
-def _parse_dependency(dependency: dict, is_conditional_task: bool = False) -> Dependency | UnsupportedValue:
+def _parse_dependency(  # pylint: disable=unused-argument
+    dependency: dict, is_conditional_task: bool = False
+) -> Dependency | UnsupportedValue:
     """
     Parses an individual dependency from a dictionary.
 

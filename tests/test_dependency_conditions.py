@@ -27,9 +27,7 @@ from wkmigrate.translators.activity_translators.activity_translator import (
     _parse_dependency,
 )
 
-_FIXTURE_DIR = os.path.join(
-    os.path.dirname(__file__), "resources", "json", "camel", "dependency_conditions"
-)
+_FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "resources", "json", "camel", "dependency_conditions")
 
 
 def _load(pipeline_name: str) -> Pipeline:
@@ -62,8 +60,7 @@ class TestCompletedCondition:
         assert len(cleanup.depends_on) == 1
         dep = cleanup.depends_on[0]
         assert not isinstance(dep, UnsupportedValue), (
-            "Dependency with 'Completed' condition returned UnsupportedValue. "
-            "See ghanse/wkmigrate#44."
+            "Dependency with 'Completed' condition returned UnsupportedValue. " "See ghanse/wkmigrate#44."
         )
         assert dep.task_key == "run_process"
 
@@ -105,8 +102,7 @@ class TestFailedCondition:
         assert len(handler.depends_on) == 1
         dep = handler.depends_on[0]
         assert not isinstance(dep, UnsupportedValue), (
-            "Dependency with 'Failed' condition returned UnsupportedValue. "
-            "See ghanse/wkmigrate#44."
+            "Dependency with 'Failed' condition returned UnsupportedValue. " "See ghanse/wkmigrate#44."
         )
         assert dep.task_key == "run_process"
 
@@ -146,8 +142,7 @@ class TestMixedConditions:
             if task.depends_on:
                 for dep in task.depends_on:
                     assert not isinstance(dep, UnsupportedValue), (
-                        f"Task '{task.name}' has UnsupportedValue dependency. "
-                        "See ghanse/wkmigrate#44."
+                        f"Task '{task.name}' has UnsupportedValue dependency. " "See ghanse/wkmigrate#44."
                     )
 
     def test_run_if_values_per_condition(self, pipeline: Pipeline) -> None:
@@ -259,13 +254,13 @@ class TestSkippedConditionUnsupported:
     def test_skipped_returns_unsupported(self) -> None:
         dep = {"activity": "upstream", "dependency_conditions": ["Skipped"]}
         result = _parse_dependency(dep)
-        assert isinstance(result, UnsupportedValue), (
-            "Dependency with 'Skipped' condition should return UnsupportedValue."
-        )
+        assert isinstance(
+            result, UnsupportedValue
+        ), "Dependency with 'Skipped' condition should return UnsupportedValue."
 
     def test_skipped_mixed_with_succeeded_returns_unsupported(self) -> None:
         dep = {"activity": "upstream", "dependency_conditions": ["Succeeded", "Skipped"]}
         result = _parse_dependency(dep)
-        assert isinstance(result, UnsupportedValue), (
-            "Dependency with ['Succeeded', 'Skipped'] should return UnsupportedValue."
-        )
+        assert isinstance(
+            result, UnsupportedValue
+        ), "Dependency with ['Succeeded', 'Skipped'] should return UnsupportedValue."
