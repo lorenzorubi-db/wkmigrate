@@ -83,7 +83,7 @@
     }
   },
   {
-    "id": "dependency_failed",
+    "id": "dependency_skipped_single",
     "description": "Activity with dependency on skipped task creates UnsupportedValue",
     "input": {
       "name": "failure_handler",

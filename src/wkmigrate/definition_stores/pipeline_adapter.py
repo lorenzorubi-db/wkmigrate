@@ -105,29 +105,48 @@ class PipelineAdapter:
         Returns:
             Activity with input and output dataset metadata.
         """
+        # NOTE: Missing datasets are caught and skipped with a warning to match the behaviour of _enrich_linked_service
+        # Arguably both datasets and linked services should raise instead of skipping - may be something to revisit
         additions: dict = {}
 
         input_datasets = activity.get("inputs")
         if input_datasets is not None:
             names = [dataset.get("reference_name") for dataset in input_datasets if isinstance(dataset, dict)]
-            additions["input_dataset_definitions"] = [
-                self.normalize_casing(self.get_dataset(name), ("dataset", name)) for name in names if name
-            ]
+            resolved = []
+            for name in names:
+                if not name:
+                    continue
+                try:
+                    resolved.append(self.normalize_casing(self.get_dataset(name), ("dataset", name)))
+                except ValueError:
+                    logger.warning(f"Dataset '{name}' not found; skipping input dataset for activity.")
+            if resolved:
+                additions["input_dataset_definitions"] = resolved
 
         output_datasets = activity.get("outputs")
         if output_datasets is not None:
             names = [dataset.get("reference_name") for dataset in output_datasets if isinstance(dataset, dict)]
-            additions["output_dataset_definitions"] = [
-                self.normalize_casing(self.get_dataset(name), ("dataset", name)) for name in names if name
-            ]
+            resolved = []
+            for name in names:
+                if not name:
+                    continue
+                try:
+                    resolved.append(self.normalize_casing(self.get_dataset(name), ("dataset", name)))
+                except ValueError:
+                    logger.warning(f"Dataset '{name}' not found; skipping output dataset for activity.")
+            if resolved:
+                additions["output_dataset_definitions"] = resolved
 
         dataset_reference = activity.get("dataset")
         if dataset_reference is not None:
             name = dataset_reference.get("reference_name")
             if name:
-                additions["input_dataset_definitions"] = [
-                    self.normalize_casing(self.get_dataset(name), ("dataset", name))
-                ]
+                try:
+                    additions["input_dataset_definitions"] = [
+                        self.normalize_casing(self.get_dataset(name), ("dataset", name))
+                    ]
+                except ValueError:
+                    logger.warning(f"Dataset '{name}' not found; skipping dataset for activity.")
 
         if not additions:
             return activity

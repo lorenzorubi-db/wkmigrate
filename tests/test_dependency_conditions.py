@@ -20,12 +20,12 @@ import pytest
 from wkmigrate.definition_stores.json_definition_store import (
     JsonDefinitionStore,
 )
-from wkmigrate.models.ir.pipeline import (
-    DatabricksNotebookActivity,
-    Pipeline,
-)
+from wkmigrate.models.ir.pipeline import Pipeline
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.preparers.preparer import prepare_workflow
+from wkmigrate.translators.activity_translators.activity_translator import (
+    _parse_dependency,
+)
 
 _FIXTURE_DIR = os.path.join(
     os.path.dirname(__file__), "resources", "json", "camel", "dependency_conditions"
@@ -168,14 +168,19 @@ class TestMixedConditions:
 
 
 # ============================================================================
-# Fix A: Completed condition inside IfCondition child activity
+# Completed condition inside IfCondition child activity
 # ============================================================================
 
 
 class TestCompletedInsideIfCondition:
     """A child activity inside an IfCondition branch that depends on a sibling
-    with 'Completed' condition should not crash. The is_conditional_task path
-    currently only allows TRUE/FALSE outcomes."""
+    with 'Completed' condition should translate and prepare without crashing.
+
+    _translate_child_activities flattens IfCondition branches into top-level
+    tasks and injects synthetic dependencies with an ``outcome`` field.  Those
+    synthetic deps are handled by Path 1 in ``_parse_dependency``.  The
+    *sibling* dependency (e.g. log_fallback → run_fallback with Completed)
+    is a regular ADF dependency handled by Path 2."""
 
     @pytest.fixture
     def pipeline(self) -> Pipeline:
@@ -201,7 +206,7 @@ class TestCompletedInsideIfCondition:
 
 
 # ============================================================================
-# Fix B: Multiple dependency conditions ['Succeeded', 'Failed']
+# Multiple dependency conditions ['Succeeded', 'Failed'] → Completed
 # ============================================================================
 
 
@@ -240,3 +245,27 @@ class TestMultiConditionDependency:
     def test_preparer_does_not_crash(self, pipeline: Pipeline) -> None:
         prepared = prepare_workflow(pipeline)
         assert len(prepared.tasks) == 2
+
+
+# ============================================================================
+# Negative: Skipped condition is unsupported
+# ============================================================================
+
+
+class TestSkippedConditionUnsupported:
+    """'Skipped' is the fourth ADF condition and is explicitly not mapped to any
+    Databricks run_if value.  It must produce UnsupportedValue."""
+
+    def test_skipped_returns_unsupported(self) -> None:
+        dep = {"activity": "upstream", "dependency_conditions": ["Skipped"]}
+        result = _parse_dependency(dep)
+        assert isinstance(result, UnsupportedValue), (
+            "Dependency with 'Skipped' condition should return UnsupportedValue."
+        )
+
+    def test_skipped_mixed_with_succeeded_returns_unsupported(self) -> None:
+        dep = {"activity": "upstream", "dependency_conditions": ["Succeeded", "Skipped"]}
+        result = _parse_dependency(dep)
+        assert isinstance(result, UnsupportedValue), (
+            "Dependency with ['Succeeded', 'Skipped'] should return UnsupportedValue."
+        )
