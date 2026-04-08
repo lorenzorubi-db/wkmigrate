@@ -154,6 +154,17 @@ def test_notebook_missing_path_returns_unsupported(notebook_activity_fixtures: l
     assert fixture["expected_message"] in result.message
 
 
+def test_notebook_expression_parameters_warns(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that expression parameters emit warnings and are set to empty string."""
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_complex")
+
+    with pytest.warns(UserWarning):
+        result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DatabricksNotebookActivity)
+    assert result.base_parameters["complex_param"] == ""
+
+
 def test_notebook_expression_parameters_resolved(notebook_activity_fixtures: list[dict]) -> None:
     """Test that simple @pipeline().parameters expressions are resolved to job parameter refs."""
     fixture = get_fixture(notebook_activity_fixtures, "expression_parameters")
@@ -167,16 +178,41 @@ def test_notebook_expression_parameters_resolved(notebook_activity_fixtures: lis
     assert result.base_parameters["expression_param"] == "{{job.parameters.dynamic_value}}"
 
 
-def test_notebook_expression_parameters_warns(notebook_activity_fixtures: list[dict]) -> None:
-    """Test that complex expression parameters emit warnings and are set to empty string."""
-    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_complex")
+def test_notebook_multiple_pipeline_parameters(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that multiple @pipeline().parameters expressions resolve alongside static params."""
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_multiple")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DatabricksNotebookActivity)
+    assert result.base_parameters["table_name"] == "{{job.parameters.tableName}}"
+    assert result.base_parameters["retention"] == "{{job.parameters.retentionDays}}"
+    assert result.base_parameters["static_value"] == "hardcoded"
+
+
+def test_notebook_braced_pipeline_parameter(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that @{pipeline().parameters.X} braced syntax resolves to a job parameter ref."""
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_braced")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = translate_activity(fixture["input"])
+
+    assert isinstance(result, DatabricksNotebookActivity)
+    assert result.base_parameters["env"] == "{{job.parameters.environment}}"
+
+
+def test_notebook_activity_output_expression_warns(notebook_activity_fixtures: list[dict]) -> None:
+    """Test that @activity().output expressions emit warnings and fall back to empty string."""
+    fixture = get_fixture(notebook_activity_fixtures, "expression_parameters_activity_output")
 
     with pytest.warns(UserWarning):
         result = translate_activity(fixture["input"])
 
     assert isinstance(result, DatabricksNotebookActivity)
-    assert result.base_parameters["static_param"] == "static_value"
-    assert result.base_parameters["complex_param"] == ""
+    assert result.base_parameters["result"] == ""
 
 
 def test_basic_spark_jar_activity(spark_jar_activity_fixtures: list[dict]) -> None:
@@ -1493,135 +1529,3 @@ def test_copy_invalid_translator_returns_unsupported(copy_activity_fixtures: lis
 
     assert isinstance(result, UnsupportedValue)
     assert "translator" in result.message.lower()
-
-
-def test_notebook_single_pipeline_parameter() -> None:
-    """Test that a single @pipeline().parameters expression resolves to a job parameter ref."""
-    activity = {
-        "name": "notebook_with_param",
-        "type": "DatabricksNotebook",
-        "depends_on": [],
-        "policy": {"timeout": "0.01:00:00"},
-        "notebook_path": "/Workspace/notebooks/my_notebook",
-        "base_parameters": {
-            "my_param": {
-                "value": "@pipeline().parameters.myParam",
-                "type": "Expression",
-            }
-        },
-    }
-    result = translate_activity(activity)
-    assert isinstance(result, DatabricksNotebookActivity)
-    assert result.base_parameters is not None
-    assert result.base_parameters["my_param"] == "{{job.parameters.myParam}}"
-
-
-def test_notebook_multiple_pipeline_parameters() -> None:
-    """Test that multiple @pipeline().parameters expressions resolve alongside static params."""
-    activity = {
-        "name": "notebook_multi_params",
-        "type": "DatabricksNotebook",
-        "depends_on": [],
-        "policy": {"timeout": "0.01:00:00"},
-        "notebook_path": "/Workspace/notebooks/multi_param_notebook",
-        "base_parameters": {
-            "table_name": {
-                "value": "@pipeline().parameters.tableName",
-                "type": "Expression",
-            },
-            "retention": {
-                "value": "@pipeline().parameters.retentionDays",
-                "type": "Expression",
-            },
-            "static_value": "hardcoded",
-        },
-    }
-    result = translate_activity(activity)
-    assert isinstance(result, DatabricksNotebookActivity)
-    assert result.base_parameters is not None
-    assert result.base_parameters["table_name"] == "{{job.parameters.tableName}}"
-    assert result.base_parameters["retention"] == "{{job.parameters.retentionDays}}"
-    assert result.base_parameters["static_value"] == "hardcoded"
-
-
-def test_notebook_pipeline_parameter_does_not_warn() -> None:
-    """Test that resolvable pipeline parameter expressions do not emit warnings."""
-    activity = {
-        "name": "notebook_no_warn",
-        "type": "DatabricksNotebook",
-        "depends_on": [],
-        "policy": {"timeout": "0.01:00:00"},
-        "notebook_path": "/Workspace/notebooks/no_warn",
-        "base_parameters": {
-            "param_a": {
-                "value": "@pipeline().parameters.paramA",
-                "type": "Expression",
-            }
-        },
-    }
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        result = translate_activity(activity)
-    assert result.base_parameters["param_a"] == "{{job.parameters.paramA}}"
-
-
-def test_notebook_braced_pipeline_parameter() -> None:
-    """Test that @{pipeline().parameters.X} braced syntax resolves to a job parameter ref."""
-    activity = {
-        "name": "notebook_braced_param",
-        "type": "DatabricksNotebook",
-        "depends_on": [],
-        "policy": {"timeout": "0.01:00:00"},
-        "notebook_path": "/Workspace/notebooks/braced_nb",
-        "base_parameters": {
-            "env": {
-                "value": "@{pipeline().parameters.environment}",
-                "type": "Expression",
-            }
-        },
-    }
-    result = translate_activity(activity)
-    assert isinstance(result, DatabricksNotebookActivity)
-    assert result.base_parameters["env"] == "{{job.parameters.environment}}"
-
-
-def test_notebook_concat_expression_warns() -> None:
-    """Test that @concat() expressions emit warnings and fall back to empty string."""
-    activity = {
-        "name": "notebook_concat",
-        "type": "DatabricksNotebook",
-        "depends_on": [],
-        "policy": {"timeout": "0.01:00:00"},
-        "notebook_path": "/Workspace/notebooks/concat_nb",
-        "base_parameters": {
-            "path": {
-                "value": "@concat(pipeline().parameters.base, '/suffix')",
-                "type": "Expression",
-            }
-        },
-    }
-    with pytest.warns(UserWarning):
-        result = translate_activity(activity)
-    assert isinstance(result, DatabricksNotebookActivity)
-    assert result.base_parameters["path"] == ""
-
-
-def test_notebook_activity_output_expression_warns() -> None:
-    """Test that @activity().output expressions emit warnings and fall back to empty string."""
-    activity = {
-        "name": "notebook_activity_ref",
-        "type": "DatabricksNotebook",
-        "depends_on": [],
-        "policy": {"timeout": "0.01:00:00"},
-        "notebook_path": "/Workspace/notebooks/activity_ref_nb",
-        "base_parameters": {
-            "result": {
-                "value": "@activity('upstream').output.value",
-                "type": "Expression",
-            }
-        },
-    }
-    with pytest.warns(UserWarning):
-        result = translate_activity(activity)
-    assert isinstance(result, DatabricksNotebookActivity)
-    assert result.base_parameters["result"] == ""
