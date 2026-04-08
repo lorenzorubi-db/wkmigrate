@@ -304,7 +304,7 @@ def _get_base_properties(activity: dict, is_conditional_task: bool = False) -> d
     cluster_spec = activity.get("linked_service_definition")
     new_cluster = translate_databricks_cluster_spec(cluster_spec) if cluster_spec else None
     task_key = activity.get("name") or "UNNAMED_TASK"
-    run_if = _derive_run_if(activity.get("depends_on")) if not is_conditional_task else None
+    run_if = _derive_run_if(activity.get("depends_on"))
     return {
         "name": task_key,
         "task_key": task_key,
@@ -455,10 +455,6 @@ def _parse_dependency(  # pylint: disable=unused-argument
     Returns:
         Dependency object describing the upstream relationship.
     """
-    # --- Path 1: synthetic IfCondition parent wiring -----------------------
-    # _translate_child_activities sets "outcome" on these; real ADF deps never
-    # have it.  Handle them first so the rest of the function only deals with
-    # genuine ADF dependency_conditions.
     outcome = dependency.get("outcome")
     if outcome is not None:
         if outcome.upper() not in ("TRUE", "FALSE"):
@@ -470,7 +466,6 @@ def _parse_dependency(  # pylint: disable=unused-argument
             return UnsupportedValue(value=dependency, message="Missing value 'activity' for task dependency")
         return Dependency(task_key=task_key, outcome=outcome)
 
-    # --- Path 2: regular ADF dependency ------------------------------------
     conditions = dependency.get("dependency_conditions", [])
     upper_conditions = _normalize_dependency_conditions(set(conditions))
 
