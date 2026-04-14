@@ -297,5 +297,126 @@
       "child_activities_count": 0
     },
     "expects_warnings": true
+  },
+  {
+    "id": "bare_parameter_enable",
+    "description": "IfCondition with bare @pipeline().parameters.enable (boolean truthy check)",
+    "input": {
+      "name": "check_enable",
+      "type": "IfCondition",
+      "description": "Check if pipeline is enabled",
+      "depends_on": [],
+      "expression": {
+        "type": "Expression",
+        "value": "@pipeline().parameters.enable"
+      },
+      "if_true_activities": [
+        {
+          "name": "run_enabled",
+          "type": "DatabricksNotebook",
+          "description": "Run when enabled",
+          "depends_on": [],
+          "policy": {
+            "timeout": "0.01:00:00",
+            "retry": 0,
+            "retry_interval_in_seconds": 30
+          },
+          "notebook_path": "/Workspace/notebooks/enabled_handler"
+        }
+      ],
+      "if_false_activities": [
+        {
+          "name": "skip_disabled",
+          "type": "DatabricksNotebook",
+          "description": "Run when disabled",
+          "depends_on": [],
+          "policy": {
+            "timeout": "0.01:00:00",
+            "retry": 0,
+            "retry_interval_in_seconds": 30
+          },
+          "notebook_path": "/Workspace/notebooks/disabled_handler"
+        }
+      ]
+    },
+    "expected": {
+      "name": "check_enable",
+      "task_key": "check_enable",
+      "activity_type": "IfCondition",
+      "op": "NOT_EQUAL",
+      "left": "{{job.parameters.enable}}",
+      "right": "",
+      "child_activities_count": 2
+    }
+  },
+  {
+    "id": "bare_parameter_debug",
+    "description": "IfCondition with bare @pipeline().parameters.debug (only true branch)",
+    "input": {
+      "name": "check_debug",
+      "type": "IfCondition",
+      "description": "Check if debug mode is on",
+      "depends_on": [],
+      "expression": {
+        "type": "Expression",
+        "value": "@pipeline().parameters.debug"
+      },
+      "if_true_activities": [
+        {
+          "name": "debug_logging",
+          "type": "DatabricksNotebook",
+          "description": "Enable debug logging",
+          "depends_on": [],
+          "policy": {
+            "timeout": "0.00:30:00"
+          },
+          "notebook_path": "/Workspace/notebooks/debug_logger"
+        }
+      ]
+    },
+    "expected": {
+      "name": "check_debug",
+      "task_key": "check_debug",
+      "activity_type": "IfCondition",
+      "op": "NOT_EQUAL",
+      "left": "{{job.parameters.debug}}",
+      "right": "",
+      "child_activities_count": 1
+    }
+  },
+  {
+    "id": "bare_parameter_braced",
+    "description": "IfCondition with braced @{pipeline().parameters.X} syntax",
+    "input": {
+      "name": "check_braced",
+      "type": "IfCondition",
+      "description": "Braced parameter syntax",
+      "depends_on": [],
+      "expression": {
+        "type": "Expression",
+        "value": "@{pipeline().parameters.runMode}"
+      },
+      "if_true_activities": [
+        {
+          "name": "run_mode_task",
+          "type": "DatabricksNotebook",
+          "description": "Handle run mode",
+          "depends_on": [],
+          "policy": {
+            "timeout": "0.01:00:00"
+          },
+          "notebook_path": "/Workspace/notebooks/run_mode"
+        }
+      ]
+    },
+    "expected": {
+      "name": "check_braced",
+      "task_key": "check_braced",
+      "activity_type": "IfCondition",
+      "op": "NOT_EQUAL",
+      "left": "{{job.parameters.runMode}}",
+      "right": "",
+      "child_activities_count": 1
+    }
   }
 ]

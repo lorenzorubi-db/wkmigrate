@@ -16,6 +16,7 @@ from wkmigrate.models.ir.pipeline import Activity, IfConditionActivity
 from wkmigrate.models.ir.translation_context import TranslationContext
 from wkmigrate.models.ir.translator_result import TranslationResult
 from wkmigrate.models.ir.unsupported import UnsupportedValue
+from wkmigrate.translators.expression_utils import resolve_pipeline_parameter_ref
 
 
 def translate_if_condition_activity(
@@ -140,6 +141,9 @@ def _parse_condition_expression(condition: dict) -> dict | UnsupportedValue:
         return UnsupportedValue(
             value=condition, message="Missing property 'value' in IfCondition activity 'expression'"
         )
+    resolved = resolve_pipeline_parameter_ref(condition_value)
+    if resolved:
+        return {"op": "NOT_EQUAL", "left": resolved, "right": ""}
     for operation in ConditionOperationPattern:
         match = re.match(string=condition_value, pattern=operation.value)
         if match is not None:
@@ -168,6 +172,6 @@ def _validate_condition_expression(expression: dict) -> UnsupportedValue | None:
         return UnsupportedValue(value=expression, message="Missing field 'op' in if condition expression")
     if not expression.get("left"):
         return UnsupportedValue(value=expression, message="Missing field 'left' in if condition expression")
-    if not expression.get("right"):
+    if expression.get("right") is None:
         return UnsupportedValue(value=expression, message="Missing field 'right' in if condition expression")
     return None
