@@ -74,6 +74,7 @@ class JsonDefinitionStore(DefinitionStore):
     source_property_case: SourcePropertyCase = SourcePropertyCase.CAMEL
     source_system: WorkflowSourceType = WorkflowSourceType.ADF
 
+    _raw_pipelines: list[dict] = field(init=False)
     _pipelines: list[dict] = field(init=False)
     _triggers: list[dict] = field(init=False)
     _datasets: list[dict] = field(init=False)
@@ -87,7 +88,8 @@ class JsonDefinitionStore(DefinitionStore):
         if not base.is_dir():
             raise ValueError(f"source_directory is not a directory: {base}")
 
-        self._pipelines = _load_all_json_from_dir(base / "pipelines")
+        self._raw_pipelines = _load_all_json_from_dir(base / "pipelines")
+        self._pipelines = list(self._raw_pipelines)
         self._triggers = _load_all_json_from_dir(base / "triggers")
         self._datasets = _load_all_json_from_dir(base / "datasets")
         self._linked_services = _load_all_json_from_dir(base / "linked_services")
@@ -127,7 +129,8 @@ class JsonDefinitionStore(DefinitionStore):
         if self._adapter is None:
             raise ValueError("Store is not initialized")
 
-        pipeline = normalize_arm_pipeline(dict(self.get_pipeline(pipeline_name)))
+        raw = self.get_raw_pipeline(pipeline_name) if self.source_property_case == SourcePropertyCase.CAMEL else None
+        pipeline = normalize_arm_pipeline(dict(self.get_pipeline(pipeline_name)), raw_pipeline=raw)
         trigger = self.get_trigger(pipeline_name)
 
         enriched = self._adapter.adapt(pipeline, trigger)
@@ -160,6 +163,13 @@ class JsonDefinitionStore(DefinitionStore):
             if pipeline.get("name") == pipeline_name:
                 return pipeline
         raise ValueError(f'No pipeline found with name "{pipeline_name}"')
+
+    def get_raw_pipeline(self, pipeline_name: str) -> dict | None:
+        """Return the pre-normalization pipeline dict, or None if not available."""
+        for pipeline in self._raw_pipelines:
+            if pipeline.get("name") == pipeline_name:
+                return pipeline
+        return None
 
     def get_trigger(self, pipeline_name: str) -> dict | None:
         """Return the trigger for the given pipeline name, or None."""

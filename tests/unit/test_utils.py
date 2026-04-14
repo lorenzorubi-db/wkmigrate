@@ -259,6 +259,181 @@ class TestNormalizeArmPipeline:
         assert isinstance(got["tags"], dict)
 
 
+def test_normalize_arm_pipeline_preserves_camel_parameter_names() -> None:
+    """Pipeline-level parameter names should be preserved when raw_pipeline is provided."""
+    normalized = {
+        "name": "p1",
+        "properties": {
+            "activities": [],
+            "parameters": {
+                "retention_days": {"type": "string"},
+                "table_or_schema_name": {"type": "string"},
+            },
+        },
+    }
+    raw = {
+        "name": "p1",
+        "properties": {
+            "activities": [],
+            "parameters": {
+                "retentionDays": {"type": "string"},
+                "tableOrSchemaName": {"type": "string"},
+            },
+        },
+    }
+    got = normalize_arm_pipeline(normalized, raw_pipeline=raw)
+    assert "retentionDays" in got["parameters"]
+    assert "tableOrSchemaName" in got["parameters"]
+    assert "retention_days" not in got["parameters"]
+    assert "table_or_schema_name" not in got["parameters"]
+
+
+def test_normalize_arm_pipeline_preserves_base_parameter_names() -> None:
+    """Activity baseParameters keys should be preserved when raw_pipeline is provided."""
+    normalized = {
+        "name": "p1",
+        "properties": {
+            "activities": [
+                {
+                    "name": "nb1",
+                    "type": "DatabricksNotebook",
+                    "type_properties": {
+                        "notebook_path": "/path",
+                        "base_parameters": {
+                            "retention_days": {"value": "@pipeline().parameters.retentionDays", "type": "Expression"},
+                        },
+                    },
+                }
+            ],
+            "parameters": {},
+        },
+    }
+    raw = {
+        "name": "p1",
+        "properties": {
+            "activities": [
+                {
+                    "name": "nb1",
+                    "type": "DatabricksNotebook",
+                    "typeProperties": {
+                        "notebookPath": "/path",
+                        "baseParameters": {
+                            "retentionDays": {"value": "@pipeline().parameters.retentionDays", "type": "Expression"},
+                        },
+                    },
+                }
+            ],
+            "parameters": {},
+        },
+    }
+    got = normalize_arm_pipeline(normalized, raw_pipeline=raw)
+    bp = got["activities"][0]["base_parameters"]
+    assert "retentionDays" in bp
+    assert "retention_days" not in bp
+
+
+def test_normalize_arm_pipeline_preserves_nested_branch_base_params() -> None:
+    """baseParameters inside IfCondition branches should be preserved."""
+    normalized = {
+        "name": "p1",
+        "properties": {
+            "activities": [
+                {
+                    "name": "cond1",
+                    "type": "IfCondition",
+                    "type_properties": {
+                        "if_true_activities": [
+                            {
+                                "name": "nb1",
+                                "type": "DatabricksNotebook",
+                                "type_properties": {
+                                    "notebook_path": "/path",
+                                    "base_parameters": {
+                                        "custom_param": "val",
+                                    },
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "parameters": {},
+        },
+    }
+    raw = {
+        "name": "p1",
+        "properties": {
+            "activities": [
+                {
+                    "name": "cond1",
+                    "type": "IfCondition",
+                    "typeProperties": {
+                        "ifTrueActivities": [
+                            {
+                                "name": "nb1",
+                                "type": "DatabricksNotebook",
+                                "typeProperties": {
+                                    "notebookPath": "/path",
+                                    "baseParameters": {
+                                        "customParam": "val",
+                                    },
+                                },
+                            }
+                        ],
+                    },
+                }
+            ],
+            "parameters": {},
+        },
+    }
+    got = normalize_arm_pipeline(normalized, raw_pipeline=raw)
+    branch = got["activities"][0]["if_true_activities"]
+    bp = branch[0]["type_properties"]["base_parameters"]
+    assert "customParam" in bp
+    assert "custom_param" not in bp
+
+
+def test_normalize_arm_pipeline_without_raw_unchanged() -> None:
+    """Without raw_pipeline, normalize_arm_pipeline behaves as before."""
+    pipeline = {
+        "name": "p1",
+        "properties": {
+            "activities": [
+                {
+                    "name": "a1",
+                    "type": "DatabricksNotebook",
+                    "type_properties": {"notebook_path": "/path", "base_parameters": {"retention_days": "30"}},
+                }
+            ],
+            "parameters": {"retention_days": {"type": "string"}},
+        },
+    }
+    got = normalize_arm_pipeline(pipeline)
+    assert "retention_days" in got["parameters"]
+    assert got["activities"][0]["base_parameters"]["retention_days"] == "30"
+
+
+def test_normalize_arm_pipeline_preserves_single_word_params() -> None:
+    """Single-word parameter names are unaffected by restore."""
+    normalized = {
+        "name": "p1",
+        "properties": {
+            "activities": [],
+            "parameters": {"enable": {"type": "string", "default_value": "True"}},
+        },
+    }
+    raw = {
+        "name": "p1",
+        "properties": {
+            "activities": [],
+            "parameters": {"enable": {"type": "string", "defaultValue": "True"}},
+        },
+    }
+    got = normalize_arm_pipeline(normalized, raw_pipeline=raw)
+    assert "enable" in got["parameters"]
+    assert got["parameters"]["enable"]["default_value"] == "True"
+
+
 # ---------------------------------------------------------------------------
 # Enum tests
 # ---------------------------------------------------------------------------

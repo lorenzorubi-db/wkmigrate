@@ -62,7 +62,58 @@ def _annotations_to_tags(annotations: list | dict | None) -> dict | None:
     return annotations
 
 
-def normalize_arm_pipeline(pipeline: dict) -> dict:
+def _restore_user_param_keys(normalized_dict: dict, original_dict: dict) -> dict:
+    """Replace snake_cased keys with their original user-defined names.
+
+    Args:
+        normalized_dict: Dict with snake_cased keys and normalized values.
+        original_dict: Dict with original (camelCase) keys.
+
+    Returns:
+        New dict with original keys mapped to normalized values.
+    """
+    snake_to_original = {camel_to_snake(k): k for k in original_dict}
+    return {snake_to_original.get(k, k): v for k, v in normalized_dict.items()}
+
+
+def _restore_all_param_keys(activities: list[dict], raw_activities: list[dict]) -> None:
+    """Restore original baseParameters keys in activities and nested branches.
+
+    Walks the normalized activity tree alongside the raw (pre-normalization)
+    tree and replaces snake_cased ``base_parameters`` keys with the originals
+    from ``baseParameters``.
+
+    Mutates ``activities`` in place.
+
+    Args:
+        activities: Normalized activity list (after ``recursive_camel_to_snake``).
+        raw_activities: Pre-normalization activity list.
+    """
+    for idx, activity in enumerate(activities):
+        if not isinstance(activity, dict) or idx >= len(raw_activities):
+            continue
+        raw_activity = raw_activities[idx]
+        raw_tp = raw_activity.get("typeProperties") or raw_activity.get("type_properties") or {}
+        norm_tp = activity.get("type_properties") or {}
+
+        raw_bp = raw_tp.get("baseParameters") or raw_tp.get("base_parameters")
+        norm_bp = norm_tp.get("base_parameters")
+        if raw_bp and norm_bp:
+            norm_tp["base_parameters"] = _restore_user_param_keys(norm_bp, raw_bp)
+
+        branch_pairs = [
+            ("if_true_activities", "ifTrueActivities"),
+            ("if_false_activities", "ifFalseActivities"),
+            ("activities", "activities"),
+        ]
+        for norm_key, raw_key in branch_pairs:
+            norm_branch = norm_tp.get(norm_key)
+            raw_branch = raw_tp.get(raw_key) or raw_tp.get(norm_key)
+            if norm_branch and raw_branch:
+                _restore_all_param_keys(norm_branch, raw_branch)
+
+
+def normalize_arm_pipeline(pipeline: dict, raw_pipeline: dict | None = None) -> dict:
     """
     Normalizes an ARM/REST-style ADF pipeline into the flat shape expected by
     translate_pipeline: top-level activities, parameters, trigger, tags, and
@@ -72,13 +123,23 @@ def normalize_arm_pipeline(pipeline: dict) -> dict:
     with "typeProperties" / "type_properties" (e.g. exported from the Azure portal).
     Call recursive_camel_to_snake first if the payload is camelCase.
 
+    When ``raw_pipeline`` is provided (the pre-normalization dict), user-defined
+    parameter names are restored to their original casing.  This preserves
+    pipeline-level parameter names and activity ``baseParameters`` keys.
+
     Args:
-        pipeline: Raw pipeline dict (camelCase or snake_case).
+        pipeline: Normalized pipeline dict (snake_case keys).
+        raw_pipeline: Pre-normalization pipeline dict. When provided, user-defined
+            parameter keys are restored to their original casing.
 
     Returns:
         Pipeline dict with name, activities, parameters, trigger, tags, and
         each activity with type_properties merged into the root.
     """
+    raw_props = None
+    if raw_pipeline is not None and isinstance(raw_pipeline.get("properties"), dict):
+        raw_props = raw_pipeline["properties"]
+
     if isinstance(pipeline.get("properties"), dict):
         props = pipeline["properties"]
         activities = props.get("activities") or props.get("Activities") or []
@@ -94,6 +155,15 @@ def normalize_arm_pipeline(pipeline: dict) -> dict:
         pipeline_definition = dict(pipeline)
         if "trigger" not in pipeline_definition:
             pipeline_definition["trigger"] = None
+
+    if raw_props is not None:
+        raw_params = raw_props.get("parameters") if "parameters" in raw_props else raw_props.get("Parameters")
+        if raw_params and pipeline_definition.get("parameters"):
+            pipeline_definition["parameters"] = _restore_user_param_keys(pipeline_definition["parameters"], raw_params)
+        raw_activities = raw_props.get("activities") or raw_props.get("Activities") or []
+        norm_activities = pipeline_definition.get("activities") or []
+        _restore_all_param_keys(norm_activities, raw_activities)
+
     activities = pipeline_definition.get("activities") or []
     normalized_activities = []
     for activity in activities:
