@@ -151,6 +151,7 @@ def visit_activity(
     activity_type = activity.get("type") or "Unsupported"
     with not_translatable_context(name, activity_type):
         base_properties = _get_base_properties(activity, is_conditional_task)
+        base_properties["depends_on"] = _expand_condition_task_deps(base_properties.get("depends_on"), context)
         result, context = _dispatch_activity(activity_type, activity, base_properties, context)
         translated = normalize_translated_result(result, base_properties)
 
@@ -484,3 +485,39 @@ def _parse_dependency(  # pylint: disable=unused-argument
         return UnsupportedValue(value=dependency, message="Missing value 'activity' for task dependency")
 
     return Dependency(task_key=task_key, outcome=None)
+
+
+def _expand_condition_task_deps(
+    dependencies: list[Dependency | UnsupportedValue] | None,
+    context: TranslationContext,
+) -> list[Dependency | UnsupportedValue] | None:
+    """Expand dependencies targeting condition_tasks to dual-outcome edges.
+
+    When a regular ADF dependency (``outcome=None``) targets an IfCondition
+    activity, Databricks requires an explicit outcome on the dependency edge.
+    This function replaces such dependencies with two edges — one for each
+    branch outcome (``true`` and ``false``) — which is the Databricks
+    equivalent of ADF's ``Completed`` condition on a condition_task.
+
+    Dependencies that already have an outcome (IfCondition children) or
+    that target non-condition tasks are left unchanged.
+
+    Args:
+        dependencies: Parsed dependency list from ``_parse_dependencies``.
+        context: Translation context with the activity cache.
+
+    Returns:
+        Dependency list with condition_task targets expanded.
+    """
+    if not dependencies:
+        return dependencies
+    expanded: list[Dependency | UnsupportedValue] = []
+    for dep in dependencies:
+        if isinstance(dep, Dependency) and dep.outcome is None:
+            cached = context.get_activity(dep.task_key)
+            if isinstance(cached, IfConditionActivity):
+                expanded.append(Dependency(task_key=dep.task_key, outcome="true"))
+                expanded.append(Dependency(task_key=dep.task_key, outcome="false"))
+                continue
+        expanded.append(dep)
+    return expanded
