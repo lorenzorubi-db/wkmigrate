@@ -5,16 +5,12 @@ representations. Each translator must validate required fields, parse the activi
 and emit ``UnsupportedValue`` objects for any unparsable inputs.
 """
 
-import re
 import warnings
 
 from wkmigrate.models.ir.pipeline import DatabricksNotebookActivity
 from wkmigrate.models.ir.unsupported import UnsupportedValue
 from wkmigrate.not_translatable import NotTranslatableWarning
-
-# Braces are independently optional; ADF serializes consistently so unbalanced
-# forms like ``@pipeline().parameters.X}`` won't appear in practice.
-_PIPELINE_PARAM_PATTERN = re.compile(r"^@\{?pipeline\(\)\.parameters\.(\w+)\}?$")
+from wkmigrate.translators.expression_utils import resolve_pipeline_parameter_ref
 
 
 def translate_notebook_activity(activity: dict, base_kwargs: dict) -> DatabricksNotebookActivity | UnsupportedValue:
@@ -96,9 +92,9 @@ def _resolve_parameter_expression(name: str, expression: dict) -> str:
         return ""
 
     raw = expression.get("value", "")
-    match = _PIPELINE_PARAM_PATTERN.match(raw)
-    if match:
-        return f"{{{{job.parameters.{match.group(1)}}}}}"
+    resolved = resolve_pipeline_parameter_ref(raw)
+    if resolved:
+        return resolved
 
     warnings.warn(
         NotTranslatableWarning(

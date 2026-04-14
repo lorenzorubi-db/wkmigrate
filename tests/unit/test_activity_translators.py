@@ -468,6 +468,45 @@ def test_if_condition_no_children(if_condition_activity_fixtures: list[dict]) ->
     assert len(result.child_activities) == 0
 
 
+def test_if_condition_bare_parameter_enable(if_condition_activity_fixtures: list[dict]) -> None:
+    """Test IfCondition with bare @pipeline().parameters.enable expression."""
+    fixture = get_fixture(if_condition_activity_fixtures, "bare_parameter_enable")
+
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, IfConditionActivity)
+    assert result.op == fixture["expected"]["op"]
+    assert result.left == fixture["expected"]["left"]
+    assert result.right == fixture["expected"]["right"]
+    assert len(result.child_activities) == fixture["expected"]["child_activities_count"]
+
+
+def test_if_condition_bare_parameter_debug(if_condition_activity_fixtures: list[dict]) -> None:
+    """Test IfCondition with bare @pipeline().parameters.debug (only true branch)."""
+    fixture = get_fixture(if_condition_activity_fixtures, "bare_parameter_debug")
+
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, IfConditionActivity)
+    assert result.op == fixture["expected"]["op"]
+    assert result.left == fixture["expected"]["left"]
+    assert result.right == fixture["expected"]["right"]
+    assert len(result.child_activities) == fixture["expected"]["child_activities_count"]
+
+
+def test_if_condition_bare_parameter_braced(if_condition_activity_fixtures: list[dict]) -> None:
+    """Test IfCondition with braced @{pipeline().parameters.X} syntax."""
+    fixture = get_fixture(if_condition_activity_fixtures, "bare_parameter_braced")
+
+    result = translate_activity(fixture["input"])
+
+    assert isinstance(result, IfConditionActivity)
+    assert result.op == fixture["expected"]["op"]
+    assert result.left == fixture["expected"]["left"]
+    assert result.right == fixture["expected"]["right"]
+    assert len(result.child_activities) == fixture["expected"]["child_activities_count"]
+
+
 def test_unsupported_type_creates_placeholder(unsupported_activity_fixtures: list[dict]) -> None:
     """Test that unsupported activity types create placeholder notebook."""
     fixture = get_fixture(unsupported_activity_fixtures, "unsupported_type")
