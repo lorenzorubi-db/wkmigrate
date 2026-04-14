@@ -229,3 +229,42 @@ def test_skipped_mixed_with_succeeded_returns_unsupported() -> None:
     dep = {"activity": "upstream", "dependency_conditions": ["Succeeded", "Skipped"]}
     result = _parse_dependency(dep)
     assert isinstance(result, UnsupportedValue)
+
+
+def test_sibling_depends_on_if_condition_translates() -> None:
+    """Pipeline where a sibling depends on an IfCondition with Completed should translate."""
+    pipeline = _load("sibling_depends_on_if_condition")
+    assert isinstance(pipeline, Pipeline)
+
+
+def test_sibling_depends_on_if_condition_has_dual_outcome() -> None:
+    """Sibling dependency on IfCondition should expand to outcome='true' + outcome='false'."""
+    pipeline = _load("sibling_depends_on_if_condition")
+    cleanup = next(t for t in pipeline.tasks if t.task_key == "cleanup")
+    outcomes = [dep.outcome for dep in cleanup.depends_on]
+    assert "true" in outcomes
+    assert "false" in outcomes
+    assert len(cleanup.depends_on) == 2
+
+
+def test_sibling_depends_on_if_condition_run_if_all_done() -> None:
+    """Sibling with Completed condition should have run_if=ALL_DONE."""
+    pipeline = _load("sibling_depends_on_if_condition")
+    cleanup = next(t for t in pipeline.tasks if t.task_key == "cleanup")
+    assert cleanup.run_if == "ALL_DONE"
+
+
+def test_sibling_depends_on_if_condition_preparer_does_not_crash() -> None:
+    """Preparer should handle dual-outcome dependencies without error."""
+    pipeline = _load("sibling_depends_on_if_condition")
+    prepared = prepare_workflow(pipeline)
+    task_keys = [t.task["task_key"] for t in prepared.activities]
+    assert "cleanup" in task_keys
+
+
+def test_sibling_depends_on_if_condition_child_outcome_unchanged() -> None:
+    """IfCondition children should still have single outcome (not expanded)."""
+    pipeline = _load("sibling_depends_on_if_condition")
+    run_main = next(t for t in pipeline.tasks if t.task_key == "run_main")
+    outcomes = [dep.outcome for dep in run_main.depends_on]
+    assert outcomes == ["true"]
