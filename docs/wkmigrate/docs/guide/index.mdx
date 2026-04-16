@@ -1,0 +1,72 @@
+---
+sidebar_position: 30
+---
+
+import Admonition from '@theme/Admonition';
+
+# Usage Guide
+
+wkmigrate is a Python library for automating migrations from Azure Data Factory pipelines to Databricks Lakeflow jobs. A typical migration has two phases: 
+- *Profiling* the source Data Factory
+- *Translating* pipelines to Databricks jobs
+
+<Admonition type="info" title="Prerequisites">
+You must have the following to use wkmigrate:
+
+- A working Python environment with wkmigrate installed (e.g. using `pip install wkmigrate`)
+- An Azure Service Principal with Data Factory permissions or a set of exported pipeline JSON files
+- A Databricks Service Principal or personal access token
+</Admonition>
+
+## Profiling a Data Factory
+
+Before migrating, profile your Azure Data Factory to understand the scope of the migration and identify any unsupported constructs. The profiler inspects every pipeline, dataset, linked service, trigger, and integration runtime in the factory and classifies each object as supported or unsupported.
+
+```python
+from wkmigrate.clients.factory_client import FactoryClient
+from wkmigrate.profiler import profile_factory, format_profile
+
+client = FactoryClient(
+    tenant_id="<TENANT_ID>",
+    client_id="<CLIENT_ID>",
+    client_secret="<CLIENT_SECRET>",
+    subscription_id="<SUBSCRIPTION_ID>",
+    resource_group_name="<RESOURCE_GROUP>",
+    factory_name="<FACTORY_NAME>",
+)
+
+profile = profile_factory(client)
+print(format_profile(profile))
+```
+
+See [Profiling a Data Factory](/docs/guide/profiling) for full details on interpreting the profile output and working with the results programmatically.
+
+## Translating Pipelines
+
+Once you've assessed migration readiness, use a definition store to load, translate, and deploy ADF pipelines as Databricks Lakeflow jobs. wkmigrate supports loading pipelines directly from Azure Data Factory or from exported JSON files, and can deploy the translated pipelines as Databricks Asset Bundles or Lakeflow Jobs.
+
+```python
+from wkmigrate.definition_stores.factory_definition_store import FactoryDefinitionStore
+from wkmigrate.definition_stores.workspace_definition_store import WorkspaceDefinitionStore
+
+# Load and translate a pipeline from Azure Data Factory
+factory_store = FactoryDefinitionStore(
+    tenant_id="<TENANT_ID>",
+    client_id="<CLIENT_ID>",
+    client_secret="<CLIENT_SECRET>",
+    subscription_id="<SUBSCRIPTION_ID>",
+    resource_group_name="<RESOURCE_GROUP>",
+    factory_name="<FACTORY_NAME>",
+)
+pipeline_ir = factory_store.load("<PIPELINE_NAME>")
+
+# Deploy the translated pipeline as a Databricks Lakeflow Job
+workspace_store = WorkspaceDefinitionStore(
+    host_name="https://adb-<workspace-id>.<region>.azuredatabricks.net",
+    pat="<DATABRICKS_PAT>",
+    authentication_type="pat",
+)
+job_id = workspace_store.to_job(pipeline_ir)
+```
+
+See [Translating Pipelines](/docs/guide/translating) for the complete guide covering definition stores, batch translation, asset bundles, and customization options.
